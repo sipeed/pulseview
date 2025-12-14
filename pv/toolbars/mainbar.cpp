@@ -552,6 +552,7 @@ void MainBar::update_device_config_widgets()
 	// Update the channels popup
 	Channels *const channels = new Channels(session_, this);
 	channels_button_.set_popup(channels);
+	QObject::connect(channels, &Channels::config_changed, this, &MainBar::on_config_changed);
 
 	// Update supported options.
 	sample_count_supported_ = false;
