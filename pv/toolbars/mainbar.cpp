@@ -812,6 +812,9 @@ void MainBar::on_config_changed()
 
 	commit_sample_count();
 	commit_sample_rate();
+	for (auto& signal: session_.signalbases()) {
+		signal->enabled_changed(signal->enabled());
+	}
 }
 
 void MainBar::on_actionNewView_triggered(QAction* action)
