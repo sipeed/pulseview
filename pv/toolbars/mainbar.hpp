@@ -94,6 +94,9 @@ public:
 
 	void reset_device_selector();
 
+	/// Adds a checkable panel (dock) toggle action to the Panels menu
+	void add_panel_action(QAction *action);
+
 	QAction* action_new_view() const;
 	QAction* action_open() const;
 	QAction* action_save() const;
@@ -104,8 +107,6 @@ public:
 	QAction* action_connect() const;
 
 private:
-	void run_stop();
-
 	void select_init_device();
 
 	void save_selection_to_file();
@@ -119,6 +120,8 @@ private:
 
 private Q_SLOTS:
 	void show_session_error(const QString text, const QString info_text);
+
+	void on_run_stop_clicked();
 
 	void export_file(shared_ptr<sigrok::OutputFormat> format,
 		bool selection_only = false, QString file_name = "");
@@ -166,7 +169,9 @@ private:
 	QAction *const action_save_setup_;
 	QAction *const action_connect_;
 
-	QToolButton *new_view_button_, *open_button_, *save_button_;
+	QToolButton *session_menu_button_;
+
+	QToolButton *run_stop_button_;
 
 	pv::widgets::DeviceToolButton device_selector_;
 
@@ -178,16 +183,21 @@ private:
 
 	pv::widgets::SweepTimingWidget sample_count_;
 	pv::widgets::SweepTimingWidget sample_rate_;
+	QAction *sample_count_caption_action_;
+	QAction *sample_rate_caption_action_;
 	bool updating_sample_rate_;
 	bool updating_sample_count_;
 
 	bool sample_count_supported_;
 
 #ifdef ENABLE_DECODE
-	QToolButton *add_decoder_button_;
+	QAction *action_add_decoder_;
 #endif
+	QAction *action_add_math_signal_;
+	QToolButton *add_signal_button_;
 
-	QToolButton *add_math_signal_button_;
+	QToolButton *panels_button_;
+	QMenu *panels_menu_;
 };
 
 } // namespace toolbars

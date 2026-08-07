@@ -77,6 +77,25 @@ public:
 	virtual void restore_settings(std::map<QString, QVariant> settings);
 
 	/**
+	 * Returns the trigger match types supported by the current device,
+	 * or an empty vector if the device does not support triggers.
+	 */
+	const vector<int32_t>& trigger_types() const;
+
+	/**
+	 * Returns the trigger match currently configured for this channel,
+	 * or nullptr if no trigger is set.
+	 */
+	const sigrok::TriggerMatchType* trigger_match() const;
+
+	/**
+	 * Sets the trigger match for this channel and applies it to the
+	 * session, taking the same path as the per-signal trigger actions.
+	 * @param match The match type to set, nullptr to clear the trigger
+	 */
+	void set_trigger_match(const sigrok::TriggerMatchType *match);
+
+	/**
 	 * Computes the vertical extents of the contents of this row item.
 	 * @return A pair containing the minimum and maximum y-values.
 	 */

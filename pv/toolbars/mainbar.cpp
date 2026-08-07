@@ -26,6 +26,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QHelpEvent>
+#include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QSettings>
@@ -98,38 +99,42 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 	action_restore_setup_(new QAction(this)),
 	action_save_setup_(new QAction(this)),
 	action_connect_(new QAction(this)),
-	new_view_button_(new QToolButton()),
-	open_button_(new QToolButton()),
-	save_button_(new QToolButton()),
+	session_menu_button_(new QToolButton()),
+	run_stop_button_(new QToolButton()),
 	device_selector_(parent, session.device_manager(), action_connect_),
 	configure_button_(this),
 	configure_button_action_(nullptr),
 	channels_button_(this),
 	channels_button_action_(nullptr),
-	sample_count_(" samples", this),
+	sample_count_("", this),
 	sample_rate_("Hz", this),
 	updating_sample_rate_(false),
 	updating_sample_count_(false),
 	sample_count_supported_(false),
 #ifdef ENABLE_DECODE
-	add_decoder_button_(new QToolButton()),
+	action_add_decoder_(new QAction(this)),
 #endif
-	add_math_signal_button_(new QToolButton())
+	action_add_math_signal_(new QAction(this)),
+	add_signal_button_(new QToolButton()),
+	panels_button_(new QToolButton()),
+	panels_menu_(new QMenu(panels_button_))
 {
 	setObjectName(QString::fromUtf8("MainBar"));
+	setMovable(false);
+	setFloatable(false);
+	setIconSize(QSize(24, 24));
+	setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
 
 	setContextMenuPolicy(Qt::PreventContextMenu);
 
 	// Actions
 	action_new_view_->setText(tr("New &View"));
-	action_new_view_->setIcon(QIcon::fromTheme("window-new",
-		QIcon(":/icons/window-new.png")));
+	action_new_view_->setIcon(QIcon(":/icons/window-new.svg"));
 	connect(action_new_view_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionNewView_triggered()));
 
 	action_open_->setText(tr("&Open..."));
-	action_open_->setIcon(QIcon::fromTheme("document-open",
-		QIcon(":/icons/document-open.png")));
+	action_open_->setIcon(QIcon(":/icons/document-open.svg"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	action_open_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
 #else
@@ -139,12 +144,12 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 		this, SLOT(on_actionOpen_triggered()));
 
 	action_restore_setup_->setText(tr("Restore Session Setu&p..."));
+	action_restore_setup_->setIcon(QIcon(":/icons/session-restore.svg"));
 	connect(action_restore_setup_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionRestoreSetup_triggered()));
 
 	action_save_->setText(tr("&Save..."));
-	action_save_->setIcon(QIcon::fromTheme("document-save-as",
-		QIcon(":/icons/document-save-as.png")));
+	action_save_->setIcon(QIcon(":/icons/document-save-as.svg"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	action_save_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
 #else
@@ -154,14 +159,12 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 		this, SLOT(on_actionSave_triggered()));
 
 	action_save_as_->setText(tr("Save &As..."));
-	action_save_as_->setIcon(QIcon::fromTheme("document-save-as",
-		QIcon(":/icons/document-save-as.png")));
+	action_save_as_->setIcon(QIcon(":/icons/document-save-edit.svg"));
 	connect(action_save_as_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionSaveAs_triggered()));
 
 	action_save_selection_as_->setText(tr("Save Selected &Range As..."));
-	action_save_selection_as_->setIcon(QIcon::fromTheme("document-save-as",
-		QIcon(":/icons/document-save-as.png")));
+	action_save_selection_as_->setIcon(QIcon(":/icons/document-save-selection.svg"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	action_save_selection_as_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
 #else
@@ -171,99 +174,110 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 		this, SLOT(on_actionSaveSelectionAs_triggered()));
 
 	action_save_setup_->setText(tr("Save Session Setu&p..."));
+	action_save_setup_->setIcon(QIcon(":/icons/session-save.svg"));
 	connect(action_save_setup_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionSaveSetup_triggered()));
 
-	widgets::ExportMenu *menu_file_export = new widgets::ExportMenu(this,
-		session.device_manager().context());
-	menu_file_export->setTitle(tr("&Export"));
-	connect(menu_file_export, SIGNAL(format_selected(shared_ptr<sigrok::OutputFormat>)),
-		this, SLOT(export_file(shared_ptr<sigrok::OutputFormat>)));
-
-	widgets::ImportMenu *menu_file_import = new widgets::ImportMenu(this,
-		session.device_manager().context());
-	menu_file_import->setTitle(tr("&Import"));
-	connect(menu_file_import, SIGNAL(format_selected(shared_ptr<sigrok::InputFormat>)),
-		this, SLOT(import_file(shared_ptr<sigrok::InputFormat>)));
-
 	action_connect_->setText(tr("&Connect to Device..."));
+	action_connect_->setIcon(QIcon(":/icons/device-connect.svg"));
 	connect(action_connect_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionConnect_triggered()));
 
-	// New view button
-	QMenu *menu_new_view = new QMenu();
+	// Session menu: use one explicit menu instead of three cramped split buttons.
+	QMenu *session_menu = new QMenu(session_menu_button_);
+	QMenu *menu_new_view = session_menu->addMenu(
+		QIcon(":/icons/window-new.svg"), tr("New &View"));
 	connect(menu_new_view, SIGNAL(triggered(QAction*)),
 		this, SLOT(on_actionNewView_triggered(QAction*)));
 
 	for (int i = 0; i < views::ViewTypeCount; i++) {
 		QAction *const action =	menu_new_view->addAction(tr(views::ViewTypeNames[i]));
+		if (i == views::ViewTypeTrace)
+			action->setIcon(QIcon(":/icons/view-trace.svg"));
+#ifdef ENABLE_DECODE
+		else if (i == views::ViewTypeDecoderBinary)
+			action->setIcon(QIcon(":/icons/view-binary.svg"));
+		else if (i == views::ViewTypeTabularDecoder)
+			action->setIcon(QIcon(":/icons/view-table.svg"));
+#endif
 		action->setData(QVariant::fromValue(i));
 	}
 
-	new_view_button_->setMenu(menu_new_view);
-	new_view_button_->setDefaultAction(action_new_view_);
-	new_view_button_->setPopupMode(QToolButton::MenuButtonPopup);
-
-	// Open button
-	vector<QAction*> open_actions;
-	open_actions.push_back(action_open_);
-	QAction* separator_o = new QAction(this);
-	separator_o->setSeparator(true);
-	open_actions.push_back(separator_o);
-	open_actions.push_back(action_restore_setup_);
-
-	widgets::ImportMenu *import_menu = new widgets::ImportMenu(this,
-		session.device_manager().context(), open_actions);
+	session_menu->addAction(action_open_);
+	widgets::ImportMenu *import_menu = new widgets::ImportMenu(
+		session_menu, session.device_manager().context());
+	import_menu->setTitle(tr("&Import"));
+	import_menu->setIcon(QIcon(":/icons/data-import.svg"));
 	connect(import_menu, SIGNAL(format_selected(shared_ptr<sigrok::InputFormat>)),
 		this, SLOT(import_file(shared_ptr<sigrok::InputFormat>)));
-
-	open_button_->setMenu(import_menu);
-	open_button_->setDefaultAction(action_open_);
-	open_button_->setPopupMode(QToolButton::MenuButtonPopup);
-
-	// Save button
-	vector<QAction*> save_actions;
-	save_actions.push_back(action_save_);
-	save_actions.push_back(action_save_as_);
-	save_actions.push_back(action_save_selection_as_);
-	QAction* separator_s = new QAction(this);
-	separator_s->setSeparator(true);
-	save_actions.push_back(separator_s);
-	save_actions.push_back(action_save_setup_);
-
-	widgets::ExportMenu *export_menu = new widgets::ExportMenu(this,
-		session.device_manager().context(), save_actions);
+	session_menu->addMenu(import_menu);
+	session_menu->addAction(action_restore_setup_);
+	session_menu->addSeparator();
+	session_menu->addAction(action_save_);
+	session_menu->addAction(action_save_as_);
+	session_menu->addAction(action_save_selection_as_);
+	widgets::ExportMenu *export_menu = new widgets::ExportMenu(
+		session_menu, session.device_manager().context());
+	export_menu->setTitle(tr("&Export"));
+	export_menu->setIcon(QIcon(":/icons/data-export.svg"));
 	connect(export_menu, SIGNAL(format_selected(shared_ptr<sigrok::OutputFormat>)),
 		this, SLOT(export_file(shared_ptr<sigrok::OutputFormat>)));
+	session_menu->addMenu(export_menu);
+	session_menu->addAction(action_save_setup_);
 
-	save_button_->setMenu(export_menu);
-	save_button_->setDefaultAction(action_save_);
-	save_button_->setPopupMode(QToolButton::MenuButtonPopup);
+	session_menu_button_->setObjectName(QString::fromUtf8("SessionMenuButton"));
+	session_menu_button_->setText(tr("Session"));
+	session_menu_button_->setIcon(QIcon(":/icons/menu.svg"));
+	session_menu_button_->setIconSize(QSize(24, 24));
+	session_menu_button_->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	session_menu_button_->setPopupMode(QToolButton::InstantPopup);
+	session_menu_button_->setMenu(session_menu);
+	session_menu_button_->setToolTip(tr("Session actions"));
+
+	// Large run/stop button, the primary action of the tool bar
+	run_stop_button_->setObjectName(QString::fromUtf8("MainRunStopButton"));
+	run_stop_button_->setText(tr("Run"));
+	run_stop_button_->setIcon(QIcon(":/icons/media-playback-start.svg"));
+	run_stop_button_->setIconSize(QSize(24, 24));
+	run_stop_button_->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	run_stop_button_->setToolTip(tr("Start/stop acquisition (Space)"));
+	connect(run_stop_button_, SIGNAL(clicked(bool)),
+		this, SLOT(on_run_stop_clicked()));
 
 	// Device selector menu
+	device_selector_.setObjectName(QString::fromUtf8("DeviceSelectorButton"));
+	device_selector_.setPopupMode(QToolButton::InstantPopup);
+	device_selector_.setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	device_selector_.setIconSize(QSize(24, 24));
+	device_selector_.setMaximumWidth(150);
 	connect(&device_selector_, SIGNAL(device_selected()),
 		this, SLOT(on_device_selected()));
 
-	// Setup the decoder button
+	QMenu *add_signal_menu = new QMenu(add_signal_button_);
 #ifdef ENABLE_DECODE
-	add_decoder_button_->setIcon(QIcon(":/icons/add-decoder.svg"));
-	add_decoder_button_->setPopupMode(QToolButton::InstantPopup);
-	add_decoder_button_->setToolTip(tr("Add protocol decoder"));
-	add_decoder_button_->setShortcut(QKeySequence(Qt::Key_D));
-
-	connect(add_decoder_button_, SIGNAL(clicked()),
+	action_add_decoder_->setText(tr("Add protocol decoder"));
+	action_add_decoder_->setIcon(QIcon(":/icons/add-decoder.svg"));
+	action_add_decoder_->setShortcut(QKeySequence(Qt::Key_D));
+	add_signal_menu->addAction(action_add_decoder_);
+	connect(action_add_decoder_, SIGNAL(triggered()),
 		this, SLOT(on_add_decoder_clicked()));
 #endif
 
-	// Setup the math signal button
-	add_math_signal_button_->setIcon(QIcon(":/icons/add-math-signal.svg"));
-	add_math_signal_button_->setPopupMode(QToolButton::InstantPopup);
-	add_math_signal_button_->setToolTip(tr("Add math signal"));
-	add_math_signal_button_->setShortcut(QKeySequence(Qt::Key_M));
-
-	connect(add_math_signal_button_, SIGNAL(clicked()),
+	action_add_math_signal_->setText(tr("Add math signal"));
+	action_add_math_signal_->setIcon(QIcon(":/icons/add-math-signal.svg"));
+	action_add_math_signal_->setShortcut(QKeySequence(Qt::Key_M));
+	add_signal_menu->addAction(action_add_math_signal_);
+	connect(action_add_math_signal_, SIGNAL(triggered()),
 		this, SLOT(on_add_math_signal_clicked()));
 
+	add_signal_button_->setObjectName(QString::fromUtf8("AddSignalButton"));
+	add_signal_button_->setText(tr("Add"));
+	add_signal_button_->setIcon(QIcon(":/icons/add-signal.svg"));
+	add_signal_button_->setIconSize(QSize(24, 24));
+	add_signal_button_->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	add_signal_button_->setPopupMode(QToolButton::InstantPopup);
+	add_signal_button_->setMenu(add_signal_menu);
+	add_signal_button_->setToolTip(tr("Add signal"));
 
 	connect(&sample_count_, SIGNAL(value_changed()),
 		this, SLOT(on_sample_count_changed()));
@@ -274,12 +288,26 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 
 	set_capture_state(pv::Session::Stopped);
 
+	configure_button_.setText(tr("Configure"));
 	configure_button_.setToolTip(tr("Configure Device"));
-	configure_button_.setIcon(QIcon::fromTheme("preferences-system",
-		QIcon(":/icons/preferences-system.png")));
+	configure_button_.setIcon(QIcon(":/icons/preferences-system.svg"));
+	configure_button_.setIconSize(QSize(24, 24));
+	configure_button_.setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
 
+	channels_button_.setText(tr("Channels"));
 	channels_button_.setToolTip(tr("Configure Channels"));
 	channels_button_.setIcon(QIcon(":/icons/channels.svg"));
+	channels_button_.setIconSize(QSize(24, 24));
+	channels_button_.setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+
+	panels_button_->setObjectName(QString::fromUtf8("PanelsButton"));
+	panels_button_->setText(tr("Panels"));
+	panels_button_->setIcon(QIcon(":/icons/dock-panels.svg"));
+	panels_button_->setIconSize(QSize(24, 24));
+	panels_button_->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+	panels_button_->setPopupMode(QToolButton::InstantPopup);
+	panels_button_->setMenu(panels_menu_);
+	panels_button_->setToolTip(tr("Show/hide dock panels"));
 
 	add_toolbar_widgets();
 
@@ -319,6 +347,30 @@ void MainBar::set_capture_state(pv::Session::capture_state state)
 	channels_button_.setEnabled(ui_enabled);
 	sample_count_.setEnabled(ui_enabled);
 	sample_rate_.setEnabled(ui_enabled);
+
+	if (state == pv::Session::Stopped) {
+		run_stop_button_->setText(tr("Run"));
+		run_stop_button_->setIcon(QIcon(":/icons/media-playback-start.svg"));
+	} else {
+		run_stop_button_->setText(tr("Stop"));
+		run_stop_button_->setIcon(QIcon(":/icons/media-playback-pause.svg"));
+	}
+
+	run_stop_button_->setEnabled(!session_.using_file_device());
+}
+
+void MainBar::on_run_stop_clicked()
+{
+	switch (session_.get_capture_state()) {
+	case Session::Stopped:
+		session_.start_capture([&](QString message) {
+			show_session_error(tr("Capture failed"), message); });
+		break;
+	case Session::AwaitingTrigger:
+	case Session::Running:
+		session_.stop_capture();
+		break;
+	}
 }
 
 void MainBar::reset_device_selector()
@@ -535,6 +587,8 @@ void MainBar::update_device_config_widgets()
 	channels_button_action_->setVisible(!!device);
 	if (!device) {
 		configure_button_action_->setVisible(false);
+		sample_count_caption_action_->setVisible(false);
+		sample_rate_caption_action_->setVisible(false);
 		sample_count_.show_none();
 		sample_rate_.show_none();
 		return;
@@ -568,6 +622,10 @@ void MainBar::update_device_config_widgets()
 	// Update sweep timing widgets.
 	update_sample_count_selector();
 	update_sample_rate_selector();
+
+	// The captions only make sense next to a visible value editor
+	sample_count_caption_action_->setVisible(sample_count_.showing());
+	sample_rate_caption_action_->setVisible(sample_rate_.showing());
 }
 
 void MainBar::commit_sample_rate()
@@ -899,6 +957,10 @@ void MainBar::on_actionRestoreSetup_triggered()
 		return;
 
 	QSettings settings_storage(file_name, QSettings::IniFormat);
+	// Force a full parse to work around Qt's lazy INI section lookup
+	// missing keys when one section name extends another (see
+	// Session::load_file for details)
+	settings_storage.allKeys();
 	session_.restore_setup(settings_storage);
 }
 
@@ -930,24 +992,48 @@ void MainBar::on_add_math_signal_clicked()
 
 void MainBar::add_toolbar_widgets()
 {
-	addWidget(new_view_button_);
-	addSeparator();
-	addWidget(open_button_);
-	addWidget(save_button_);
+	// Run/stop, the primary action
+	addWidget(run_stop_button_);
 	addSeparator();
 
-	StandardBar::add_toolbar_widgets();
+	// Session actions
+	addWidget(session_menu_button_);
+	addSeparator();
 
+	// Device selection and configuration
 	addWidget(&device_selector_);
 	configure_button_action_ = addWidget(&configure_button_);
 	channels_button_action_ = addWidget(&channels_button_);
-	addWidget(&sample_count_);
-	addWidget(&sample_rate_);
-#ifdef ENABLE_DECODE
 	addSeparator();
-	addWidget(add_decoder_button_);
-#endif
-	addWidget(add_math_signal_button_);
+
+	// Acquisition parameters with captions so their purpose is obvious
+	QLabel *sample_count_caption = new QLabel(tr("Samples"), this);
+	sample_count_caption->setObjectName(QString::fromUtf8("ToolbarCaption"));
+	sample_count_caption_action_ = addWidget(sample_count_caption);
+	sample_count_.setMaximumWidth(90);
+	addWidget(&sample_count_);
+
+	QLabel *sample_rate_caption = new QLabel(tr("Rate"), this);
+	sample_rate_caption->setObjectName(QString::fromUtf8("ToolbarCaption"));
+	sample_rate_caption_action_ = addWidget(sample_rate_caption);
+	sample_rate_.setMaximumWidth(90);
+	addWidget(&sample_rate_);
+	addSeparator();
+
+	// Signals
+	addWidget(add_signal_button_);
+	addSeparator();
+
+	// Zoom and cursors (from the standard bar)
+	StandardBar::add_toolbar_widgets();
+
+	// Dock panel toggles live in a labeled menu
+	addWidget(panels_button_);
+}
+
+void MainBar::add_panel_action(QAction *action)
+{
+	panels_menu_->addAction(action);
 }
 
 bool MainBar::eventFilter(QObject *watched, QEvent *event)

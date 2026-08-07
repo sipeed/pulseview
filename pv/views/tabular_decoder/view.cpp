@@ -200,8 +200,7 @@ View::View(Session &session, bool is_main_view, QMainWindow *parent) :
 
 	// Configure actions
 	save_action_->setText(tr("&Save..."));
-	save_action_->setIcon(QIcon::fromTheme("document-save-as",
-		QIcon(":/icons/document-save-as.png")));
+	save_action_->setIcon(QIcon(":/icons/document-save-as.svg"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	save_action_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
 #else
@@ -216,12 +215,15 @@ View::View(Session &session, bool is_main_view, QMainWindow *parent) :
 
 	for (int i = 0; i < SaveTypeCount; i++) {
 		QAction *const action =	save_menu->addAction(tr(SaveTypeNames[i]));
+		action->setIcon(QIcon(":/icons/document-save-as.svg"));
 		action->setData(QVariant::fromValue(i));
 	}
 
 	save_button_->setMenu(save_menu);
 	save_button_->setDefaultAction(save_action_);
-	save_button_->setPopupMode(QToolButton::MenuButtonPopup);
+	save_button_->setObjectName(QString::fromUtf8("SaveMenuButton"));
+	save_button_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	save_button_->setPopupMode(QToolButton::InstantPopup);
 
 	// Set up the models and the table view
 	filter_proxy_model_->setSourceModel(model_);

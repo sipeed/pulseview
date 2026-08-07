@@ -34,6 +34,7 @@
 #include "view.hpp"
 
 #include "pv/globalsettings.hpp"
+#include "pv/theme.hpp"
 #include "pv/widgets/colorbutton.hpp"
 #include "pv/widgets/popup.hpp"
 
@@ -44,12 +45,13 @@ namespace pv {
 namespace views {
 namespace trace {
 
-const QPen Trace::AxisPen(QColor(0, 0, 0, 30 * 256 / 100));
+const QPen Trace::AxisPen(QColor(0x9A, 0xA1, 0xAD, 77));
 const int Trace::LabelHitPadding = 2;
 
-const QColor Trace::BrightGrayBGColor = QColor(0, 0, 0, 10 * 255 / 100);
-const QColor Trace::DarkGrayBGColor = QColor(0, 0, 0, 15 * 255 / 100);
-const QColor Trace::ErrorBgColor = QColor(0xEF, 0x29, 0x29);
+// Subtle brightening/darkening stripes on the dark canvas
+const QColor Trace::BrightGrayBGColor = QColor(0xFF, 0xFF, 0xFF, 10);
+const QColor Trace::DarkGrayBGColor = QColor(0xFF, 0xFF, 0xFF, 5);
+const QColor Trace::ErrorBgColor = QColor(0xF2, 0x6D, 0x6D);  // Theme::error()
 
 Trace::Trace(shared_ptr<data::SignalBase> signal) :
 	base_(signal),
@@ -194,7 +196,7 @@ void Trace::paint_error(QPainter &p, const ViewItemPaintParams &pp)
 
 	p.drawRoundedRect(text_rect.adjusted(-r, -r, r, r), r, r, Qt::AbsoluteSize);
 
-	p.setPen(Qt::black);
+	p.setPen(Theme::bg_canvas());
 	p.drawText(text_rect, message);
 }
 
@@ -348,7 +350,7 @@ void Trace::paint_hover_marker(QPainter &p)
 	if (x == -1)
 		return;
 
-	p.setPen(QPen(QColor(Qt::lightGray)));
+	p.setPen(QPen(Theme::text_secondary()));
 
 	const pair<int, int> extents = v_extents();
 

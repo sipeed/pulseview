@@ -136,23 +136,23 @@ static int strnatcmp0(char const *a, char const *b, int fold_case)
 }
 
 // Compare, recognizing numeric strings and being case sensitive
-int strnatcmp(char const *a, char const *b)
+inline int strnatcmp(char const *a, char const *b)
 {
 	return strnatcmp0(a, b, 0);
 }
 
-int strnatcmp(const string a, const string b)
+inline int strnatcmp(const string a, const string b)
 {
 	return strnatcmp0(a.c_str(), b.c_str(), 0);
 }
 
 // Compare, recognizing numeric strings and ignoring case
-int strnatcasecmp(char const *a, char const *b)
+inline int strnatcasecmp(char const *a, char const *b)
 {
 	return strnatcmp0(a, b, 1);
 }
 
-int strnatcasecmp(const string a, const string b)
+inline int strnatcasecmp(const string a, const string b)
 {
 	return strnatcmp0(a.c_str(), b.c_str(), 1);
 }

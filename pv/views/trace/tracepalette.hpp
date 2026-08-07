@@ -30,7 +30,7 @@ class TracePalette
 {
 public:
 	static const unsigned int Cols = 8;
-	static const unsigned int Rows = 4;
+	static const unsigned int Rows = 2;
 	static const QColor Colors[Cols * Rows];
 };
 

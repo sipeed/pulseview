@@ -32,18 +32,29 @@
 #include <QCloseEvent>
 #include <QDebug>
 #include <QDockWidget>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QShortcut>
+#include <QStatusBar>
+#include <QTabBar>
+#include <QVBoxLayout>
 #include <QWidget>
 
 #include "mainwindow.hpp"
 
+#include "config.h"
+
 #include "application.hpp"
 #include "devicemanager.hpp"
+#include "devices/device.hpp"
 #include "devices/hardwaredevice.hpp"
 #include "dialogs/settings.hpp"
+#include "dock/triggerdock.hpp"
 #include "globalsettings.hpp"
 #include "toolbars/mainbar.hpp"
 #include "util.hpp"
@@ -51,6 +62,9 @@
 #include "views/trace/standardbar.hpp"
 
 #ifdef ENABLE_DECODE
+#include "dock/protocoldock.hpp"
+#include "dock/measuredock.hpp"
+#include "dock/searchdock.hpp"
 #include "subwindows/decoder_selector/subwindow.hpp"
 #include "views/decoder_binary/view.hpp"
 #include "views/tabular_decoder/view.hpp"
@@ -154,11 +168,12 @@ shared_ptr<views::ViewBase> MainWindow::add_view(views::ViewType type,
 		title = session.name();
 
 	QDockWidget* dock = new QDockWidget(title, main_window);
-	dock->setObjectName(title);
+	dock->setObjectName(QString::fromUtf8("ViewDock"));
 	main_window->addDockWidget(Qt::TopDockWidgetArea, dock);
 
 	// Insert a QMainWindow into the dock widget to allow for a tool bar
 	QMainWindow *dock_main = new QMainWindow(dock);
+	dock_main->setObjectName(QString::fromUtf8("ViewContainer"));
 	dock_main->setWindowFlags(Qt::Widget);  // Remove Qt::Window flag
 
 	if (type == views::ViewTypeTrace)
@@ -184,12 +199,21 @@ shared_ptr<views::ViewBase> MainWindow::add_view(views::ViewType type,
 	dock->setFeatures(QDockWidget::DockWidgetMovable |
 		QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
 
-	QAbstractButton *close_btn =
-		dock->findChildren<QAbstractButton*>("qt_dockwidget_closebutton")  // clazy:exclude=detaching-temporary
-			.front();
+	/* The main view's dock title would merely duplicate the session tab
+	 * name, so its title bar is hidden. Closing the main view is done by
+	 * closing the session tab instead (which asks for confirmation). */
+	const bool is_main_view = (type == views::ViewTypeTrace) && !main_bar;
 
-	connect(close_btn, SIGNAL(clicked(bool)),
-		this, SLOT(on_view_close_clicked()));
+	if (is_main_view)
+		dock->setTitleBarWidget(new QWidget(dock));
+	else {
+		QAbstractButton *close_btn =
+			dock->findChildren<QAbstractButton*>("qt_dockwidget_closebutton")  // clazy:exclude=detaching-temporary
+				.front();
+
+		connect(close_btn, SIGNAL(clicked(bool)),
+			this, SLOT(on_view_close_clicked()));
+	}
 
 	connect(&session, SIGNAL(trigger_event(int, util::Timestamp)),
 		qobject_cast<views::ViewBase*>(v.get()),
@@ -214,12 +238,6 @@ shared_ptr<views::ViewBase> MainWindow::add_view(views::ViewType type,
 				this, SLOT(on_show_decoder_selector(Session*)));
 
 			main_bar->action_view_show_cursors()->setChecked(tv->cursors_shown());
-
-			/* For the main view we need to prevent the dock widget from
-			 * closing itself when its close button is clicked. This is
-			 * so we can confirm with the user first. Regular views don't
-			 * need this */
-			close_btn->disconnect(SIGNAL(clicked()), dock, SLOT(close()));
 		} else {
 			/* Additional view, create a standard bar */
 			pv::views::trace::StandardBar *standard_bar =
@@ -350,8 +368,11 @@ shared_ptr<Session> MainWindow::add_session()
 	sessions_.push_back(session);
 
 	QMainWindow *window = new QMainWindow();
+	window->setObjectName(QString::fromUtf8("SessionWorkspace"));
 	window->setWindowFlags(Qt::Widget);  // Remove Qt::Window flag
 	session_windows_[session] = window;
+
+	hide_welcome_page();
 
 	int index = session_selector_.addTab(window, name);
 	session_selector_.setCurrentIndex(index);
@@ -359,16 +380,165 @@ shared_ptr<Session> MainWindow::add_session()
 
 	window->setDockNestingEnabled(true);
 
-	add_view(views::ViewTypeTrace, *session);
+	shared_ptr<views::ViewBase> main_view =
+		add_view(views::ViewTypeTrace, *session);
+	update_status_bar(session.get());
+
+#ifdef ENABLE_DECODE
+	// Add the protocol decoder dock to the right of the session workspace
+	QDockWidget *protocol_dock = new QDockWidget(tr("Protocol Decoders"), window);
+	protocol_dock->setObjectName(QString::fromUtf8("ProtocolDockWidget"));
+
+	dock::ProtocolDock *protocol_panel =
+		new dock::ProtocolDock(*session, protocol_dock);
+	protocol_dock->setWidget(protocol_panel);
+
+	protocol_dock->setContextMenuPolicy(Qt::PreventContextMenu);
+	protocol_dock->setFeatures(QDockWidget::DockWidgetMovable |
+		QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+
+	// Note: the session workspace has no central widget, in which case Qt
+	// does not honor the right dock area and places the dock at the bottom
+	// instead. Splitting with the trace view dock achieves the intended
+	// side-by-side layout.
+	window->addDockWidget(Qt::RightDockWidgetArea, protocol_dock);
+
+	QDockWidget *trace_dock = nullptr;
+	for (auto& entry : view_docks_)
+		if (entry.second == main_view)
+			trace_dock = entry.first;
+
+	if (trace_dock) {
+		window->splitDockWidget(trace_dock, protocol_dock, Qt::Horizontal);
+		window->resizeDocks({protocol_dock}, {360}, Qt::Horizontal);
+	}
+
+	connect(protocol_panel, SIGNAL(decode_table_requested(Session*)),
+		this, SLOT(on_decode_table_requested(Session*)));
+
+	// Hidden by default like the other panels, toggled from the Panels
+	// menu so that the tool bar gets the full window width
+	protocol_dock->hide();
+
+	// Make the dock's toggle action available on the main bar
+	shared_ptr<MainBar> main_bar = session->main_bar();
+	if (main_bar) {
+		QAction *toggle_action = protocol_dock->toggleViewAction();
+		toggle_action->setIcon(QIcon(":/icons/dock-protocol.svg"));
+		toggle_action->setToolTip(tr("Show/hide the protocol decoder panel"));
+		main_bar->add_panel_action(toggle_action);
+	}
+#endif
+
+	// Add the measurement dock to the right of the session workspace
+	QDockWidget *measure_dock = new QDockWidget(tr("Measurements"), window);
+	measure_dock->setObjectName(QString::fromUtf8("MeasureDockWidget"));
+
+	dock::MeasureDock *measure_panel =
+		new dock::MeasureDock(*session, measure_dock);
+	measure_dock->setWidget(measure_panel);
+
+	measure_dock->setContextMenuPolicy(Qt::PreventContextMenu);
+	measure_dock->setFeatures(QDockWidget::DockWidgetMovable |
+		QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+
+	window->addDockWidget(Qt::RightDockWidgetArea, measure_dock);
+
+#ifdef ENABLE_DECODE
+	// Share the right dock area with the protocol decoder dock
+	window->tabifyDockWidget(protocol_dock, measure_dock);
+	protocol_dock->raise();
+#else
+	// Same right-area quirk as for the protocol dock above: without a
+	// central widget the right dock area is not honored, so split
+	// explicitly with the trace view dock
+	QDockWidget *trace_dock = nullptr;
+	for (auto& entry : view_docks_)
+		if (entry.second == main_view)
+			trace_dock = entry.first;
+
+	if (trace_dock) {
+		window->splitDockWidget(trace_dock, measure_dock, Qt::Horizontal);
+		window->resizeDocks({measure_dock}, {360}, Qt::Horizontal);
+	}
+#endif
+
+	// Hidden by default, toggled from the main bar
+	measure_dock->hide();
+
+	// Note: main_bar is only declared above when ENABLE_DECODE is set
+	shared_ptr<MainBar> measure_main_bar = session->main_bar();
+	if (measure_main_bar) {
+		QAction *toggle_action = measure_dock->toggleViewAction();
+		toggle_action->setIcon(QIcon(":/icons/dock-measure.svg"));
+		toggle_action->setToolTip(tr("Show/hide the measurement panel"));
+		measure_main_bar->add_panel_action(toggle_action);
+	}
+
+	// Add the trigger dock, tabified with the other right-side docks
+	QDockWidget *trigger_dock = new QDockWidget(tr("Trigger"), window);
+	trigger_dock->setObjectName(QString::fromUtf8("TriggerDockWidget"));
+
+	dock::TriggerDock *trigger_panel =
+		new dock::TriggerDock(*session, trigger_dock);
+	trigger_dock->setWidget(trigger_panel);
+
+	trigger_dock->setContextMenuPolicy(Qt::PreventContextMenu);
+	trigger_dock->setFeatures(QDockWidget::DockWidgetMovable |
+		QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+
+	window->addDockWidget(Qt::RightDockWidgetArea, trigger_dock);
+	window->tabifyDockWidget(measure_dock, trigger_dock);
+
+	// Hidden by default, toggled from the main bar
+	trigger_dock->hide();
+
+	shared_ptr<MainBar> trigger_main_bar = session->main_bar();
+	if (trigger_main_bar) {
+		QAction *toggle_action = trigger_dock->toggleViewAction();
+		toggle_action->setIcon(QIcon(":/icons/dock-trigger.svg"));
+		toggle_action->setToolTip(tr("Show/hide the trigger panel"));
+		trigger_main_bar->add_panel_action(toggle_action);
+	}
+
+#ifdef ENABLE_DECODE
+	// Add the search dock to the bottom of the session workspace
+	QDockWidget *search_dock = new QDockWidget(tr("Search"), window);
+	search_dock->setObjectName(QString::fromUtf8("SearchDockWidget"));
+
+	dock::SearchDock *search_panel =
+		new dock::SearchDock(*session, search_dock);
+	search_dock->setWidget(search_panel);
+
+	search_dock->setContextMenuPolicy(Qt::PreventContextMenu);
+	search_dock->setFeatures(QDockWidget::DockWidgetMovable |
+		QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+
+	window->addDockWidget(Qt::BottomDockWidgetArea, search_dock);
+
+	// Same no-central-widget quirk as for the protocol dock above: split
+	// with the trace view dock to keep the bottom area honored
+	if (trace_dock) {
+		window->splitDockWidget(trace_dock, search_dock, Qt::Vertical);
+		window->resizeDocks({search_dock}, {220}, Qt::Vertical);
+	}
+
+	// Hidden by default, toggled from the main bar
+	search_dock->hide();
+
+	if (main_bar) {
+		QAction *toggle_action = search_dock->toggleViewAction();
+		toggle_action->setIcon(QIcon(":/icons/dock-search.svg"));
+		toggle_action->setToolTip(tr("Show/hide the search panel"));
+		main_bar->add_panel_action(toggle_action);
+	}
+#endif
 
 	return session;
 }
 
 void MainWindow::remove_session(shared_ptr<Session> session)
 {
-	// Determine the height of the button before it collapses
-	int h = new_session_button_->height();
-
 	// Stop capture while the session still exists so that the UI can be
 	// updated in case we're currently running. If so, this will schedule a
 	// call to our on_capture_state_changed() slot for the next run of the
@@ -394,19 +564,99 @@ void MainWindow::remove_session(shared_ptr<Session> session)
 		return s == session; });
 
 	if (sessions_.empty()) {
-		// When there are no more tabs, the height of the QTabWidget
-		// drops to zero. We must prevent this to keep the static
-		// widgets visible
-		for (QWidget *w : static_tab_widget_->findChildren<QWidget*>())  // clazy:exclude=range-loop
-			w->setMinimumHeight(h);
-
-		int margin = static_tab_widget_->layout()->contentsMargins().bottom();
-		static_tab_widget_->setMinimumHeight(h + 2 * margin);
-		session_selector_.setMinimumHeight(h + 2 * margin);
+		// Without any session there is no useful UI left, so we show the
+		// welcome page instead of an empty window
+		show_welcome_page();
 
 		// Update the window title if there is no view left to
 		// generate focus change events
 		setWindowTitle(WindowTitle);
+		update_status_bar(nullptr);
+	}
+}
+
+void MainWindow::show_welcome_page()
+{
+	if (welcome_page_)
+		return;
+
+	welcome_page_ = new QWidget();
+	welcome_page_->setObjectName(QString::fromUtf8("WelcomePage"));
+
+	QLabel *icon_label = new QLabel();
+	icon_label->setPixmap(QIcon(":/icons/pulseview.svg").pixmap(64, 64));
+
+	QLabel *title_label = new QLabel(WindowTitle);
+	title_label->setObjectName(QString::fromUtf8("WelcomeTitle"));
+
+	QLabel *hint_label = new QLabel(
+		tr("No session is open. Create a new session or open a capture file."));
+	hint_label->setObjectName(QString::fromUtf8("WelcomeHint"));
+
+	QPushButton *new_session_btn = new QPushButton(
+		QIcon(":/icons/document-new.svg"), tr("New Session"));
+	connect(new_session_btn, SIGNAL(clicked(bool)),
+		this, SLOT(on_welcome_new_session_clicked()));
+
+	QPushButton *open_btn = new QPushButton(
+		QIcon(":/icons/document-open.svg"), tr("Open Capture..."));
+	open_btn->setDefault(true);
+	connect(open_btn, SIGNAL(clicked(bool)),
+		this, SLOT(on_welcome_open_clicked()));
+
+	QHBoxLayout *button_layout = new QHBoxLayout();
+	button_layout->setSpacing(12);
+	button_layout->addWidget(new_session_btn);
+	button_layout->addWidget(open_btn);
+
+	QVBoxLayout *layout = new QVBoxLayout(welcome_page_);
+	layout->setSpacing(12);
+	layout->addStretch();
+	layout->addWidget(icon_label, 0, Qt::AlignHCenter);
+	layout->addWidget(title_label, 0, Qt::AlignHCenter);
+	layout->addWidget(hint_label, 0, Qt::AlignHCenter);
+	layout->addSpacing(8);
+	layout->addLayout(button_layout);
+	layout->setAlignment(button_layout, Qt::AlignHCenter);
+	layout->addStretch();
+
+	int index = session_selector_.addTab(welcome_page_, tr("Welcome"));
+	session_selector_.setCurrentIndex(index);
+
+	// The welcome page is a placeholder, not a session - it can't be closed
+	session_selector_.tabBar()->setTabButton(index, QTabBar::RightSide, nullptr);
+}
+
+void MainWindow::hide_welcome_page()
+{
+	if (!welcome_page_)
+		return;
+
+	session_selector_.removeTab(session_selector_.indexOf(welcome_page_));
+	welcome_page_->deleteLater();
+	welcome_page_ = nullptr;
+}
+
+void MainWindow::on_welcome_new_session_clicked()
+{
+	add_default_session();
+}
+
+void MainWindow::on_welcome_open_clicked()
+{
+	QSettings settings;
+	const QString dir = settings.value("MainWindow/OpenDirectory").toString();
+
+	const QString file_name = QFileDialog::getOpenFileName(
+		this, tr("Open File"), dir, tr(
+			"sigrok Sessions (*.sr);;"
+			"All Files (*)"));
+
+	if (!file_name.isEmpty()) {
+		add_session_with_file(file_name.toStdString(), "", "");
+
+		const QString abs_path = QFileInfo(file_name).absolutePath();
+		settings.setValue("MainWindow/OpenDirectory", abs_path);
 	}
 }
 
@@ -425,26 +675,36 @@ void MainWindow::add_default_session()
 
 	shared_ptr<Session> session = add_session();
 
-	// Check the list of available devices. Prefer the one that was
-	// found with user supplied scan specs (if applicable). Then try
-	// one of the auto detected devices that are not the demo device.
-	// Pick demo in the absence of "genuine" hardware devices.
+	// Prefer a device found using the user's scan specification, then any
+	// auto-detected physical device, then the virtual demo device (which
+	// generates synthetic data and supports full acquisition control).
+	// Only when no device at all is available, show the bundled read-only
+	// demonstration capture.
 	shared_ptr<devices::HardwareDevice> user_device, other_device, demo_device;
 	for (const shared_ptr<devices::HardwareDevice>& dev : device_manager_.devices()) {
 		if (dev == device_manager_.user_spec_device()) {
 			user_device = dev;
-		} else if (dev->hardware_device()->driver()->name() == "demo") {
-			demo_device = dev;
-		} else {
+		} else if (dev->hardware_device()->driver()->name() != "demo") {
 			other_device = dev;
+		} else {
+			demo_device = dev;
 		}
 	}
 	if (user_device)
 		session->select_device(user_device);
 	else if (other_device)
 		session->select_device(other_device);
-	else
+	else if (demo_device)
 		session->select_device(demo_device);
+	else {
+		const string demo_capture = PV_DATA_DIR "/demo/slogic32-demo.sr";
+		const string demo_setup = PV_DATA_DIR "/demo/slogic32-demo.pvs";
+		if (QFileInfo::exists(QString::fromStdString(demo_capture)))
+			session->load_init_file(demo_capture, "", demo_setup);
+		else
+			qWarning() << "Bundled demo capture is missing:"
+				<< QString::fromStdString(demo_capture);
+	}
 }
 
 void MainWindow::save_sessions()
@@ -492,11 +752,13 @@ void MainWindow::setup_ui()
 {
 	setObjectName(QString::fromUtf8("MainWindow"));
 
+	welcome_page_ = nullptr;
+
 	setCentralWidget(&session_selector_);
 
 	// Set the window icon
 	QIcon icon;
-	icon.addFile(QString(":/icons/pulseview.png"));
+	icon.addFile(QString(":/icons/pulseview.svg"));
 	setWindowIcon(icon);
 
 	// Set up keyboard shortcuts that affect all views at once
@@ -514,43 +776,69 @@ void MainWindow::setup_ui()
 
 	// Set up the tab area
 	new_session_button_ = new QToolButton();
-	new_session_button_->setIcon(QIcon::fromTheme("document-new",
-		QIcon(":/icons/document-new.png")));
+	new_session_button_->setObjectName(QString::fromUtf8("NewSessionButton"));
+	new_session_button_->setIcon(QIcon(":/icons/document-new.svg"));
 	new_session_button_->setToolTip(tr("Create New Session"));
 	new_session_button_->setAutoRaise(true);
+	new_session_button_->setIconSize(QSize(16, 16));
 
-	run_stop_button_ = new QToolButton();
-	run_stop_button_->setAutoRaise(true);
-	run_stop_button_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	run_stop_button_->setToolTip(tr("Start/Stop Acquisition"));
-
-	run_stop_shortcut_ = new QShortcut(QKeySequence(Qt::Key_Space), run_stop_button_, SLOT(click()));
+	// Run/stop lives in the main tool bar as a large button now; the
+	// space bar shortcut still works application-wide
+	run_stop_shortcut_ = new QShortcut(QKeySequence(Qt::Key_Space), this, SLOT(on_run_stop_clicked()));
 	run_stop_shortcut_->setAutoRepeat(false);
 
 	settings_button_ = new QToolButton();
-	settings_button_->setIcon(QIcon::fromTheme("preferences-system",
-		QIcon(":/icons/preferences-system.png")));
+	settings_button_->setObjectName(QString::fromUtf8("SettingsButton"));
+	settings_button_->setIcon(QIcon(":/icons/preferences-system.svg"));
 	settings_button_->setToolTip(tr("Settings"));
 	settings_button_->setAutoRaise(true);
+	settings_button_->setIconSize(QSize(16, 16));
 
-	QFrame *separator1 = new QFrame();
-	separator1->setFrameStyle(QFrame::VLine | QFrame::Raised);
 	QFrame *separator2 = new QFrame();
-	separator2->setFrameStyle(QFrame::VLine | QFrame::Raised);
+	separator2->setFrameStyle(QFrame::VLine | QFrame::Plain);
+	separator2->setObjectName(QString::fromUtf8("ControlSeparator"));
 
 	QHBoxLayout* layout = new QHBoxLayout();
-	layout->setContentsMargins(2, 2, 2, 2);
+	layout->setContentsMargins(8, 0, 8, 0);
+	layout->setSpacing(4);
 	layout->addWidget(new_session_button_);
-	layout->addWidget(separator1);
-	layout->addWidget(run_stop_button_);
 	layout->addWidget(separator2);
 	layout->addWidget(settings_button_);
 
 	static_tab_widget_ = new QWidget();
+	static_tab_widget_->setObjectName(QString::fromUtf8("SessionControls"));
 	static_tab_widget_->setLayout(layout);
 
-	session_selector_.setCornerWidget(static_tab_widget_, Qt::TopLeftCorner);
+	session_selector_.setObjectName(QString::fromUtf8("SessionSelector"));
+	session_selector_.setCornerWidget(static_tab_widget_, Qt::TopRightCorner);
 	session_selector_.setTabsClosable(true);
+	session_selector_.setDocumentMode(true);
+	session_selector_.setMovable(true);
+	session_selector_.setElideMode(Qt::ElideRight);
+	session_selector_.setUsesScrollButtons(true);
+
+	QStatusBar *status_bar = statusBar();
+	status_bar->setObjectName(QString::fromUtf8("AppStatusBar"));
+	status_bar->setSizeGripEnabled(false);
+	status_session_label_ = new QLabel(tr("No session"), status_bar);
+	status_session_label_->setObjectName(QString::fromUtf8("StatusSession"));
+	status_capture_label_ = new QLabel(tr("Ready"), status_bar);
+	status_capture_label_->setObjectName(QString::fromUtf8("StatusCapture"));
+	status_device_label_ = new QLabel(tr("No device"), status_bar);
+	status_device_label_->setObjectName(QString::fromUtf8("StatusDevice"));
+
+	QFrame *status_separator1 = new QFrame(status_bar);
+	status_separator1->setFrameStyle(QFrame::VLine | QFrame::Plain);
+	status_separator1->setObjectName(QString::fromUtf8("StatusSeparator"));
+	QFrame *status_separator2 = new QFrame(status_bar);
+	status_separator2->setFrameStyle(QFrame::VLine | QFrame::Plain);
+	status_separator2->setObjectName(QString::fromUtf8("StatusSeparator"));
+
+	status_bar->addWidget(status_session_label_);
+	status_bar->addPermanentWidget(status_separator1);
+	status_bar->addPermanentWidget(status_capture_label_);
+	status_bar->addPermanentWidget(status_separator2);
+	status_bar->addPermanentWidget(status_device_label_);
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	close_application_shortcut_ = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), this, SLOT(close()));
@@ -563,8 +851,6 @@ void MainWindow::setup_ui()
 
 	connect(new_session_button_, SIGNAL(clicked(bool)),
 		this, SLOT(on_new_session_clicked()));
-	connect(run_stop_button_, SIGNAL(clicked(bool)),
-		this, SLOT(on_run_stop_clicked()));
 	connect(settings_button_, SIGNAL(clicked(bool)),
 		this, SLOT(on_settings_clicked()));
 
@@ -579,23 +865,36 @@ void MainWindow::setup_ui()
 		this, SLOT(on_focus_changed()));
 }
 
-void MainWindow::update_acq_button(Session *session)
+void MainWindow::update_status_bar(Session *session)
 {
-	int state;
-	QString run_caption;
+	if (!status_session_label_ || !status_capture_label_ || !status_device_label_)
+		return;
 
-	if (session) {
-		state = session->get_capture_state();
-		run_caption = session->using_file_device() ? tr("Reload") : tr("Run");
-	} else {
-		state = Session::Stopped;
-		run_caption = tr("Run");
+	if (!session) {
+		status_session_label_->setText(tr("No session"));
+		status_capture_label_->setText(tr("Ready"));
+		status_device_label_->setText(tr("No device"));
+		return;
 	}
 
-	const QIcon *icons[] = {&icon_grey_, &icon_red_, &icon_green_};
-	run_stop_button_->setIcon(*icons[state]);
-	run_stop_button_->setText((state == pv::Session::Stopped) ?
-		run_caption : tr("Stop"));
+	status_session_label_->setText(session->name());
+
+	switch (session->get_capture_state()) {
+	case Session::Stopped:
+		status_capture_label_->setText(tr("Ready"));
+		break;
+	case Session::AwaitingTrigger:
+		status_capture_label_->setText(tr("Waiting for trigger"));
+		break;
+	case Session::Running:
+		status_capture_label_->setText(tr("Acquiring"));
+		break;
+	}
+
+	shared_ptr<devices::Device> device = session->device();
+	status_device_label_->setText(device ?
+		QString::fromStdString(device->display_name(device_manager_)) :
+		tr("No device"));
 }
 
 void MainWindow::save_ui_settings()
@@ -618,7 +917,7 @@ void MainWindow::restore_ui_settings()
 		restoreGeometry(settings.value("geometry").toByteArray());
 		restoreState(settings.value("state").toByteArray());
 	} else
-		resize(1000, 720);
+		resize(1440, 900);
 
 	settings.endGroup();
 }
@@ -758,7 +1057,7 @@ void MainWindow::on_focused_session_changed(shared_ptr<Session> session)
 	setWindowTitle(session->name() + " - " + WindowTitle);
 
 	// Update the state of the run/stop button, too
-	update_acq_button(session.get());
+	update_status_bar(session.get());
 }
 
 void MainWindow::on_new_session_clicked()
@@ -796,8 +1095,10 @@ void MainWindow::on_session_name_changed()
 		}
 
 	// Refresh window title if the affected session has focus
-	if (session == last_focused_session_.get())
+	if (session == last_focused_session_.get()) {
 		setWindowTitle(session->name() + " - " + WindowTitle);
+		update_status_bar(session);
+	}
 }
 
 void MainWindow::on_session_device_changed()
@@ -810,7 +1111,7 @@ void MainWindow::on_session_device_changed()
 	if ((sessions_.size() > 1) && (session != last_focused_session_.get()))
 		return;
 
-	update_acq_button(session);
+	update_status_bar(session);
 }
 
 void MainWindow::on_session_capture_state_changed(int state)
@@ -825,7 +1126,7 @@ void MainWindow::on_session_capture_state_changed(int state)
 	if ((sessions_.size() > 1) && (session != last_focused_session_.get()))
 		return;
 
-	update_acq_button(session);
+	update_status_bar(session);
 }
 
 void MainWindow::on_new_view(Session *session, int view_type)
@@ -896,7 +1197,7 @@ void MainWindow::on_tab_close_requested(int index)
 		remove_session(session);
 
 	if (sessions_.empty())
-		update_acq_button(nullptr);
+		update_status_bar(nullptr);
 }
 
 void MainWindow::on_show_decoder_selector(Session *session)
@@ -919,6 +1220,18 @@ void MainWindow::on_show_decoder_selector(Session *session)
 	for (shared_ptr<Session>& s : sessions_)
 		if (s.get() == session)
 			add_subwindow(subwindows::SubWindowTypeDecoderSelector, *s);
+#else
+	(void)session;
+#endif
+}
+
+void MainWindow::on_decode_table_requested(Session *session)
+{
+#ifdef ENABLE_DECODE
+	// We get a pointer and need a reference
+	for (shared_ptr<Session>& s : sessions_)
+		if (s.get() == session)
+			add_view(views::ViewTypeTabularDecoder, *s);
 #else
 	(void)session;
 #endif

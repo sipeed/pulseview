@@ -73,18 +73,18 @@ namespace pv {
 namespace views {
 namespace trace {
 
-const QPen AnalogSignal::AxisPen(QColor(0, 0, 0, 30 * 256 / 100), 2);
-const QColor AnalogSignal::GridMajorColor = QColor(0, 0, 0, 40 * 256 / 100);
-const QColor AnalogSignal::GridMinorColor = QColor(0, 0, 0, 20 * 256 / 100);
+const QPen AnalogSignal::AxisPen(QColor(0x9A, 0xA1, 0xAD, 77), 2);
+const QColor AnalogSignal::GridMajorColor = QColor(0xE4, 0xE7, 0xEC, 40);
+const QColor AnalogSignal::GridMinorColor = QColor(0xE4, 0xE7, 0xEC, 20);
 
-const QColor AnalogSignal::SamplingPointColorLo = QColor(200, 0, 0, 80 * 256 / 100);
-const QColor AnalogSignal::SamplingPointColorNe = QColor(0,   0, 0, 80 * 256 / 100);
-const QColor AnalogSignal::SamplingPointColorHi = QColor(0, 200, 0, 80 * 256 / 100);
+const QColor AnalogSignal::SamplingPointColorLo = QColor(0xF2, 0x6D, 0x6D, 204);
+const QColor AnalogSignal::SamplingPointColorNe = QColor(0xE4, 0xE7, 0xEC, 204);
+const QColor AnalogSignal::SamplingPointColorHi = QColor(0x34, 0xC7, 0x7B, 204);
 
-const QColor AnalogSignal::ThresholdColor = QColor(0, 0, 0, 30 * 256 / 100);
-const QColor AnalogSignal::ThresholdColorLo = QColor(255, 0, 0, 8 * 256 / 100);
-const QColor AnalogSignal::ThresholdColorNe = QColor(0,   0, 0, 10 * 256 / 100);
-const QColor AnalogSignal::ThresholdColorHi = QColor(0, 255, 0, 8 * 256 / 100);
+const QColor AnalogSignal::ThresholdColor = QColor(0x9A, 0xA1, 0xAD, 77);
+const QColor AnalogSignal::ThresholdColorLo = QColor(0xF2, 0x6D, 0x6D, 20);
+const QColor AnalogSignal::ThresholdColorNe = QColor(0xE4, 0xE7, 0xEC, 26);
+const QColor AnalogSignal::ThresholdColorHi = QColor(0x34, 0xC7, 0x7B, 20);
 
 const int64_t AnalogSignal::TracePaintBlockSize = 1024 * 1024;  // 4 MiB (due to float)
 const float AnalogSignal::EnvelopeThreshold = 64.0f;
@@ -502,8 +502,13 @@ void AnalogSignal::paint_envelope(QPainter &p,
 	if (e.length < 2)
 		return;
 
+	// The envelope is a filled area; use a translucent trace color so dense
+	// waveforms read as a soft band instead of a garish solid block
+	QColor fill_color = base_->color();
+	fill_color.setAlpha(110);
+
 	p.setPen(QPen(Qt::NoPen));
-	p.setBrush(base_->color());
+	p.setBrush(fill_color);
 
 	QRectF *const rects = new QRectF[e.length];
 	QRectF *rect = rects;

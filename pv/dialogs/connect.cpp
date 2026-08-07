@@ -62,6 +62,10 @@ Connect::Connect(QWidget *parent, pv::DeviceManager &device_manager) :
 {
 	setWindowTitle(tr("Connect to Device"));
 
+	layout_.setContentsMargins(12, 12, 12, 12);
+	layout_.setSpacing(12);
+	form_layout_.setVerticalSpacing(12);
+
 	connect(&button_box_, SIGNAL(accepted()), this, SLOT(accept()));
 	connect(&button_box_, SIGNAL(rejected()), this, SLOT(reject()));
 
@@ -84,6 +88,8 @@ Connect::Connect(QWidget *parent, pv::DeviceManager &device_manager) :
 
 	serial_config_ = new QWidget();
 	QHBoxLayout *serial_config_layout = new QHBoxLayout(serial_config_);
+	serial_config_layout->setContentsMargins(0, 0, 0, 0);
+	serial_config_layout->setSpacing(8);
 
 	serial_devices_.setEditable(true);
 	serial_devices_.setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -103,6 +109,7 @@ Connect::Connect(QWidget *parent, pv::DeviceManager &device_manager) :
 
 	tcp_config_ = new QWidget();
 	QHBoxLayout *tcp_config_layout = new QHBoxLayout(tcp_config_);
+	tcp_config_layout->setSpacing(8);
 	tcp_host_ = new QLineEdit;
 	tcp_host_->setText("192.168.1.100");
 	tcp_config_layout->addWidget(tcp_host_);
@@ -112,7 +119,7 @@ Connect::Connect(QWidget *parent, pv::DeviceManager &device_manager) :
 	tcp_port_->setValue(5555);
 	tcp_config_layout->addWidget(tcp_port_);
 
-	tcp_config_layout->addSpacing(30);
+	tcp_config_layout->addSpacing(16);
 	tcp_config_layout->addWidget(new QLabel(tr("Protocol:")));
 	tcp_protocol_ = new QComboBox();
 	tcp_protocol_->addItem("Raw TCP", QVariant("tcp-raw/%1/%2"));

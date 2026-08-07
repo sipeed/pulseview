@@ -40,6 +40,7 @@ using std::string;
 struct srd_decoder;
 
 class QVBoxLayout;
+class QLabel;
 
 namespace pv {
 
@@ -102,7 +103,10 @@ public:
 
 private:
 	void setup_ui();
-	void update_acq_button(Session *session);
+	void update_status_bar(Session *session);
+
+	void show_welcome_page();
+	void hide_welcome_page();
 
 	void save_ui_settings();
 	void restore_ui_settings();
@@ -131,6 +135,9 @@ private Q_SLOTS:
 	void on_new_session_clicked();
 	void on_settings_clicked();
 
+	void on_welcome_new_session_clicked();
+	void on_welcome_open_clicked();
+
 	void on_session_name_changed();
 	void on_session_device_changed();
 	void on_session_capture_state_changed(int state);
@@ -142,6 +149,7 @@ private Q_SLOTS:
 	void on_tab_close_requested(int index);
 
 	void on_show_decoder_selector(Session *session);
+	void on_decode_table_requested(Session *session);
 	void on_sub_window_close_clicked();
 
 	void on_view_colored_bg_shortcut();
@@ -163,8 +171,10 @@ private:
 	map< shared_ptr<Session>, QMainWindow*> session_windows_;
 
 	QWidget *static_tab_widget_;
-	QToolButton *new_session_button_, *run_stop_button_, *settings_button_;
+	QWidget *welcome_page_;
+	QToolButton *new_session_button_, *settings_button_;
 	QTabWidget session_selector_;
+	QLabel *status_session_label_, *status_capture_label_, *status_device_label_;
 
 	QIcon icon_red_;
 	QIcon icon_green_;

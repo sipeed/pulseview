@@ -33,6 +33,8 @@
 
 #include "popup.hpp"
 
+#include <pv/theme.hpp>
+
 using std::max;
 using std::min;
 
@@ -290,8 +292,7 @@ void Popup::paintEvent(QPaintEvent*)
 	QPainter painter(this);
 	painter.setRenderHint(QPainter::Antialiasing);
 
-	const QColor outline_color(QApplication::palette().color(
-		QPalette::Dark));
+	const QColor outline_color = Theme::border_strong();
 
 	// Draw the bubble
 	const QRegion b = bubble_region();
@@ -300,7 +301,7 @@ void Popup::paintEvent(QPaintEvent*)
 		b.translated(-1, 0).intersected(b.translated(0, -1)))));
 
 	painter.setPen(Qt::NoPen);
-	painter.setBrush(QApplication::palette().brush(QPalette::Window));
+	painter.setBrush(Theme::bg_elevated());
 	painter.drawRect(rect());
 
 	// Draw the arrow

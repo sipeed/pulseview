@@ -49,27 +49,27 @@ StandardBar::StandardBar(Session &session, QWidget *parent,
 	segment_selector_(new QSpinBox(this))
 {
 	setObjectName(QString::fromUtf8("StandardBar"));
+	setMovable(false);
+	setFloatable(false);
+	setIconSize(QSize(16, 16));
 
 	// Actions
 	action_view_zoom_in_->setText(tr("Zoom &In"));
-	action_view_zoom_in_->setIcon(QIcon::fromTheme("zoom-in",
-		QIcon(":/icons/zoom-in.png")));
+	action_view_zoom_in_->setIcon(QIcon(":/icons/zoom-in.svg"));
 	// simply using Qt::Key_Plus shows no + in the menu
 	action_view_zoom_in_->setShortcut(QKeySequence::ZoomIn);
 	connect(action_view_zoom_in_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionViewZoomIn_triggered()));
 
 	action_view_zoom_out_->setText(tr("Zoom &Out"));
-	action_view_zoom_out_->setIcon(QIcon::fromTheme("zoom-out",
-		QIcon(":/icons/zoom-out.png")));
+	action_view_zoom_out_->setIcon(QIcon(":/icons/zoom-out.svg"));
 	action_view_zoom_out_->setShortcut(QKeySequence::ZoomOut);
 	connect(action_view_zoom_out_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionViewZoomOut_triggered()));
 
 	action_view_zoom_fit_->setCheckable(true);
-	action_view_zoom_fit_->setText(tr("Zoom to &Fit"));
-	action_view_zoom_fit_->setIcon(QIcon::fromTheme("zoom-fit-best",
-		QIcon(":/icons/zoom-fit-best.png")));
+	action_view_zoom_fit_->setText(tr("&Fit"));
+	action_view_zoom_fit_->setIcon(QIcon(":/icons/zoom-fit-best.svg"));
 	action_view_zoom_fit_->setShortcut(QKeySequence(Qt::Key_F));
 	connect(action_view_zoom_fit_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionViewZoomFit_triggered(bool)));
@@ -79,7 +79,7 @@ StandardBar::StandardBar(Session &session, QWidget *parent,
 	action_view_show_cursors_->setShortcut(QKeySequence(Qt::Key_C));
 	connect(action_view_show_cursors_, SIGNAL(triggered(bool)),
 		this, SLOT(on_actionViewShowCursors_triggered()));
-	action_view_show_cursors_->setText(tr("Show &Cursors"));
+	action_view_show_cursors_->setText(tr("&Cursors"));
 
 	action_sdm_last_->setIcon(QIcon(":/icons/view-displaymode-last_segment.svg"));
 	action_sdm_last_->setText(tr("Display last segment only"));
@@ -143,6 +143,17 @@ void StandardBar::add_toolbar_widgets()
 	addAction(action_view_zoom_in_);
 	addAction(action_view_zoom_out_);
 	addAction(action_view_zoom_fit_);
+
+	// The zoom icons are self-explanatory, so they stay icon-only to
+	// leave room for labeled buttons on narrow windows
+	for (QAction *action : {action_view_zoom_in_, action_view_zoom_out_,
+			action_view_zoom_fit_}) {
+		QToolButton *button =
+			qobject_cast<QToolButton*>(widgetForAction(action));
+		if (button)
+			button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+	}
+
 	addSeparator();
 	addAction(action_view_show_cursors_);
 	multi_segment_actions_.push_back(addSeparator());

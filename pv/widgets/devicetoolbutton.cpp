@@ -50,10 +50,11 @@ DeviceToolButton::DeviceToolButton(QWidget *parent,
 	mapper_(this),
 	devices_()
 {
-	setPopupMode(QToolButton::MenuButtonPopup);
+	setObjectName(QString::fromUtf8("DeviceSelectorButton"));
+	setPopupMode(QToolButton::InstantPopup);
 	setMenu(&menu_);
 	setDefaultAction(connect_action_);
-	setMinimumWidth(QFontMetrics(font()).averageCharWidth() * 24);
+	setMinimumWidth(QFontMetrics(font()).averageCharWidth() * 18);
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	connect(&mapper_, SIGNAL(mappedObject(QObject*)),
@@ -103,6 +104,7 @@ void DeviceToolButton::update_device_list()
 
 		QAction *const a = new QAction(QString::fromStdString(
 			dev->display_name(device_manager_)), this);
+		a->setIcon(QIcon(":/icons/device.svg"));
 		a->setCheckable(true);
 		a->setChecked(selected_device_ == dev);
 		a->setData(QVariant::fromValue((void*)dev.get()));

@@ -69,13 +69,13 @@ QHexView::QHexView(QWidget *parent):
 	setFocusPolicy(Qt::StrongFocus);
 
 	if (palette().color(QPalette::ButtonText).toHsv().value() > 127) {
-		// Color is bright
-		chunk_colors_.emplace_back(100, 149, 237); // QColorConstants::Svg::cornflowerblue
-		chunk_colors_.emplace_back(60, 179, 113);  // QColorConstants::Svg::mediumseagreen
-		chunk_colors_.emplace_back(210, 180, 140); // QColorConstants::Svg::tan
-		visible_range_color_ = QColor("#fff5ee");  // QColorConstants::Svg::seashell
+		// Dark theme: use theme token tones that read well on dark backgrounds
+		chunk_colors_.emplace_back(0x4F, 0xC3, 0xF7);  // Theme trace cyan
+		chunk_colors_.emplace_back(0x81, 0xC7, 0x84);  // Theme trace green
+		chunk_colors_.emplace_back(0xFF, 0xB7, 0x4D);  // Theme trace amber
+		visible_range_color_ = QColor(0x33, 0x38, 0x45);  // Theme::bg_active()
 	} else {
-		// Color is dark
+		// Bright theme
 		chunk_colors_.emplace_back(0, 0, 139);    // QColorConstants::Svg::darkblue
 		chunk_colors_.emplace_back(34, 139, 34);  // QColorConstants::Svg::forestgreen
 		chunk_colors_.emplace_back(160, 82, 45);  // QColorConstants::Svg::sienna

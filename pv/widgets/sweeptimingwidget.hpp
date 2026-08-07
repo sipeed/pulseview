@@ -56,6 +56,9 @@ public:
 	uint64_t value() const;
 	void set_value(uint64_t value);
 
+	/// True when the widget currently shows a value editor or list
+	bool showing() const { return value_type_ != None; }
+
 Q_SIGNALS:
 	void value_changed();
 

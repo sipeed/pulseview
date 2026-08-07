@@ -70,6 +70,7 @@ ExportMenu::ExportMenu(QWidget *parent, shared_ptr<Context> context,
 		assert(f.second);
 		QAction *const action =	addAction(tr("Export %1...")
 			.arg(QString::fromStdString(f.second->description())));
+		action->setIcon(QIcon(":/icons/data-export.svg"));
 		action->setData(QVariant::fromValue((void*)f.second.get()));
 		mapper_.setMapping(action, action);
 		connect(action, SIGNAL(triggered()), &mapper_, SLOT(map()));

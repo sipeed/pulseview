@@ -94,16 +94,22 @@ Settings::Settings(DeviceManager &device_manager, QWidget *parent) :
 
 	// Create pages
 	page_list = new PageListWidget();
+	page_list->setObjectName(QString::fromUtf8("SettingsNav"));
 	page_list->setViewMode(QListView::ListMode);
+	page_list->setIconSize(QSize(16, 16));
 	page_list->setMovement(QListView::Static);
 	page_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	page_list->setMinimumWidth(160);
+	page_list->setMaximumWidth(180);
 
 	pages = new QStackedWidget;
+	pages->setObjectName(QString::fromUtf8("SettingsPages"));
 	create_pages();
 	page_list->setCurrentIndex(page_list->model()->index(0, 0));
 
 	// Create the rest of the dialog
 	QHBoxLayout *tab_layout = new QHBoxLayout;
+	tab_layout->setSpacing(12);
 	tab_layout->addWidget(page_list);
 	tab_layout->addWidget(pages, Qt::AlignLeft);
 
@@ -130,7 +136,7 @@ void Settings::create_pages()
 	pages->addWidget(get_general_settings_form(pages));
 
 	QListWidgetItem *generalButton = new QListWidgetItem(page_list);
-	generalButton->setIcon(QIcon(":/icons/settings-general.png"));
+	generalButton->setIcon(QIcon(":/icons/settings-general.svg"));
 	generalButton->setText(tr("General"));
 	generalButton->setTextAlignment(Qt::AlignVCenter);
 	generalButton->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
@@ -587,14 +593,14 @@ QWidget *Settings::get_logging_page(QWidget *parent) const
 
 	// Save to file
 	QPushButton *save_log_pb = new QPushButton(
-		QIcon::fromTheme("document-save-as", QIcon(":/icons/document-save-as.png")),
+		QIcon(":/icons/document-save-as.svg"),
 		tr("&Save to File"));
 	connect(save_log_pb, SIGNAL(clicked(bool)),
 		this, SLOT(on_log_saveToFile_clicked(bool)));
 
 	// Pop out
 	QPushButton *pop_out_pb = new QPushButton(
-		QIcon::fromTheme("window-new", QIcon(":/icons/window-new.png")),
+		QIcon(":/icons/window-new.svg"),
 		tr("&Pop out"));
 	connect(pop_out_pb, SIGNAL(clicked(bool)),
 		this, SLOT(on_log_popOut_clicked(bool)));

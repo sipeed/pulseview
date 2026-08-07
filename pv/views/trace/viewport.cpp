@@ -28,6 +28,7 @@
 #include "viewport.hpp"
 
 #include <pv/session.hpp>
+#include <pv/theme.hpp>
 
 #include <QMouseEvent>
 #include <QScreen>
@@ -54,6 +55,13 @@ Viewport::Viewport(View &parent) :
 {
 	setAutoFillBackground(true);
 	setBackgroundRole(QPalette::Base);
+
+	// The waveform canvas is darker than regular input surfaces
+	if (GlobalSettings::current_theme_is_dark()) {
+		QPalette pal = palette();
+		pal.setColor(QPalette::Base, Theme::bg_canvas());
+		setPalette(pal);
+	}
 
 	// Set up settings and event handlers
 	GlobalSettings settings;

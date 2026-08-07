@@ -40,6 +40,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QTextStream>
+#include <QTimer>
 
 #include "config.h"
 
@@ -184,6 +185,14 @@ int main(int argc, char *argv[])
 
 	// Initialize libsigrokflow. Must be called after Gst::init().
 	Srf::init();
+#endif
+
+	// Qt 5 otherwise asks icon engines for a 1x pixmap and lets macOS upscale it
+	// on Retina displays. Enable high-DPI icon pixmaps before QApplication is
+	// constructed so SVG icons are rasterized directly at the screen DPR.
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
 	Application a(argc, argv);
@@ -348,6 +357,45 @@ int main(int argc, char *argv[])
 			else
 				for (string& open_file : open_files)
 					w.add_session_with_file(open_file, open_file_format, open_setup_file);
+
+			// Headless self-screenshot hook for UI QA:
+			// PV_SCREENSHOT=/path/out.png PV_SCREENSHOT_DELAY=3000 pulseview
+			// PV_OPEN_SETTINGS=1 additionally opens the settings dialog
+			const QString screenshot_path =
+				qEnvironmentVariable("PV_SCREENSHOT");
+			if (!screenshot_path.isEmpty()) {
+				const int delay_ms = qEnvironmentVariableIntValue(
+					"PV_SCREENSHOT_DELAY");
+				QTimer::singleShot(delay_ms > 0 ? delay_ms : 3000, &w,
+					[&w, screenshot_path]() {
+						if (qEnvironmentVariableIsSet("PV_OPEN_SETTINGS")) {
+							QTimer::singleShot(1500, &w, [screenshot_path]() {
+								QWidget *dlg = QApplication::activeModalWidget();
+								if (dlg)
+									dlg->grab().save(screenshot_path);
+								QApplication::quit();
+							});
+							QMetaObject::invokeMethod(&w, "on_settings_clicked");
+						} else {
+							int grab_delay_ms = 1000;
+							if (qEnvironmentVariableIsSet(
+								"PV_CLOSE_CURRENT_TAB"))
+								QMetaObject::invokeMethod(&w,
+									"on_close_current_tab");
+							if (qEnvironmentVariableIsSet("PV_PRESS_RUN")) {
+								QMetaObject::invokeMethod(&w,
+									"on_run_stop_clicked");
+								// Leave time for the acquisition to finish
+								grab_delay_ms = 8000;
+							}
+							QTimer::singleShot(grab_delay_ms, &w, [screenshot_path, &w]() {
+								w.grab().save(screenshot_path);
+								if (qEnvironmentVariableIsSet("PV_SCREENSHOT_QUIT"))
+									w.close();
+							});
+						}
+					});
+			}
 
 #ifdef ENABLE_SIGNALS
 			if (SignalHandler::prepare_signals()) {

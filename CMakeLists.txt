@@ -338,6 +338,7 @@ set(pulseview_SOURCES
 	pv/metadata_obj.cpp
 	pv/session.cpp
 	pv/storesession.cpp
+	pv/theme.cpp
 	pv/util.cpp
 	pv/binding/binding.cpp
 	pv/binding/inputoutput.cpp
@@ -359,6 +360,8 @@ set(pulseview_SOURCES
 	pv/dialogs/inputoutputoptions.cpp
 	pv/dialogs/settings.cpp
 	pv/dialogs/storeprogress.cpp
+	pv/dock/measuredock.cpp
+	pv/dock/triggerdock.cpp
 	pv/popups/deviceoptions.cpp
 	pv/popups/channels.cpp
 	pv/prop/bool.cpp
@@ -417,6 +420,7 @@ set(pulseview_HEADERS
 	pv/metadata_obj.hpp
 	pv/session.hpp
 	pv/storesession.hpp
+	pv/theme.hpp
 	pv/binding/device.hpp
 	pv/data/analog.hpp
 	pv/data/analogsegment.hpp
@@ -428,6 +432,8 @@ set(pulseview_HEADERS
 	pv/dialogs/inputoutputoptions.hpp
 	pv/dialogs/settings.hpp
 	pv/dialogs/storeprogress.hpp
+	pv/dock/measuredock.hpp
+	pv/dock/triggerdock.hpp
 	pv/popups/channels.hpp
 	pv/popups/deviceoptions.hpp
 	pv/prop/bool.hpp
@@ -489,6 +495,8 @@ if(ENABLE_DECODE)
 		pv/data/decode/decoder.cpp
 		pv/data/decode/row.cpp
 		pv/data/decode/rowdata.cpp
+		pv/dock/protocoldock.cpp
+		pv/dock/searchdock.cpp
 		pv/subwindows/decoder_selector/item.cpp
 		pv/subwindows/decoder_selector/model.cpp
 		pv/subwindows/decoder_selector/subwindow.cpp
@@ -503,6 +511,8 @@ if(ENABLE_DECODE)
 
 	list(APPEND pulseview_HEADERS
 		pv/data/decodesignal.hpp
+		pv/dock/protocoldock.hpp
+		pv/dock/searchdock.hpp
 		pv/subwindows/decoder_selector/subwindow.hpp
 		pv/views/decoder_binary/view.hpp
 		pv/views/decoder_binary/QHexView.hpp
@@ -693,6 +703,12 @@ install(FILES contrib/org.sigrok.PulseView.appdata.xml DESTINATION ${CMAKE_INSTA
 # Install the PulseView icons.
 install(FILES icons/pulseview.png DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps)
 install(FILES icons/pulseview.svg DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps)
+
+# Read-only capture shown when no physical acquisition device is connected.
+install(FILES
+	contrib/demo/slogic32-demo.sr
+	contrib/demo/slogic32-demo.pvs
+	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pulseview/demo)
 
 # Generate Windows installer script.
 configure_file(contrib/pulseview_cross.nsi.in ${CMAKE_CURRENT_BINARY_DIR}/contrib/pulseview_cross.nsi @ONLY)

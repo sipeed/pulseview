@@ -776,6 +776,16 @@ void Session::load_file(QString file_name, QString setup_file_name,
 
 	if (QFileInfo::exists(setup_file_name) && QFileInfo(setup_file_name).isReadable()) {
 		QSettings settings_storage(setup_file_name, QSettings::IniFormat);
+		// Work around a Qt INI parser flaw (still present in Qt 5.15 and
+		// Qt 6.x): sections are parsed lazily and the lookup in
+		// QConfFileSettingsPrivate::ensureSectionParsed() checks only the
+		// lexicographically greatest section prefix below the queried key.
+		// When one section name extends another (e.g. "decode_signal0/"
+		// vs "decode_signal0/decoder0/"), keys of the parent section that
+		// sort after the sub-section name ("name", "decoders", "enabled")
+		// are never found, silently dropping the decoder stack. Forcing a
+		// full parse up front avoids the broken lazy lookup.
+		settings_storage.allKeys();
 		restore_setup(settings_storage);
 	}
 

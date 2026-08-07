@@ -65,12 +65,12 @@ namespace trace {
 
 const float LogicSignal::Oversampling = 2.0f;
 
-const QColor LogicSignal::EdgeColor(0x80, 0x80, 0x80);
-const QColor LogicSignal::HighColor(0x00, 0xC0, 0x00);
-const QColor LogicSignal::LowColor(0xC0, 0x00, 0x00);
-const QColor LogicSignal::SamplingPointColor(0x77, 0x77, 0x77);
+const QColor LogicSignal::EdgeColor(0x59, 0x60, 0x70);  // Theme::text_disabled() - dim so dense transitions blend
+const QColor LogicSignal::HighColor(0x34, 0xC7, 0x7B);  // Theme::success()
+const QColor LogicSignal::LowColor(0xF2, 0x6D, 0x6D);   // Theme::error()
+const QColor LogicSignal::SamplingPointColor(0x9A, 0xA1, 0xAD);  // Theme::text_secondary()
 
-QColor LogicSignal::TriggerMarkerBackgroundColor = QColor(0xED, 0xD4, 0x00);
+QColor LogicSignal::TriggerMarkerBackgroundColor = QColor(0xE5, 0xB5, 0x67);  // Theme::warning()
 const int LogicSignal::TriggerMarkerPadding = 2;
 const char* LogicSignal::TriggerMarkerIcons[8] = {
 	nullptr,
@@ -562,6 +562,28 @@ void LogicSignal::populate_popup_form(QWidget *parent, QFormLayout *form)
 
 		form->addRow(tr("Trigger"), trigger_bar_);
 	}
+}
+
+const vector<int32_t>& LogicSignal::trigger_types() const
+{
+	return trigger_types_;
+}
+
+const TriggerMatchType* LogicSignal::trigger_match() const
+{
+	return trigger_match_;
+}
+
+void LogicSignal::set_trigger_match(const TriggerMatchType *match)
+{
+	if (trigger_match_ == match)
+		return;
+
+	trigger_match_ = match;
+
+	// Same application path as on_trigger(): rebuild the session trigger
+	// and refresh the trigger marker via row_item_appearance_changed()
+	modify_trigger();
 }
 
 void LogicSignal::modify_trigger()

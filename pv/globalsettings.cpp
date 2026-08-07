@@ -33,6 +33,7 @@
 
 #include "globalsettings.hpp"
 #include "application.hpp"
+#include "theme.hpp"
 
 using std::map;
 using std::pair;
@@ -45,7 +46,8 @@ namespace pv {
 const vector< pair<QString, QString> > Themes {
 	{"None" , ""},
 	{"QDarkStyleSheet", ":/themes/qdarkstyle/style.qss"},
-	{"DarkStyle", ":/themes/darkstyle/darkstyle.qss"}
+	{"DarkStyle", ":/themes/darkstyle/darkstyle.qss"},
+	{"PulseView Dark", ":/themes/pulseview-dark/pulseview-dark.qss"}
 };
 
 const QString GlobalSettings::Key_General_Language = "General_Language";
@@ -112,9 +114,15 @@ void GlobalSettings::set_defaults_where_needed()
 		apply_language();
 	}
 
-	// Use no theme by default
+	// Use the PulseView Dark theme by default. Existing explicit theme
+	// choices remain untouched; the old unstyled default is migrated once.
 	if (!contains(Key_General_Theme))
-		setValue(Key_General_Theme, 0);
+		setValue(Key_General_Theme, 3);
+	else if (value(Key_General_Theme).toInt() == 0 &&
+		!contains("General_DarkThemeMigration")) {
+		setValue(Key_General_Theme, 3);
+		setValue("General_DarkThemeMigration", true);
+	}
 	if (!contains(Key_General_Style))
 		setValue(Key_General_Style, "");
 
@@ -195,10 +203,10 @@ void GlobalSettings::set_bright_theme_default_colors()
 void GlobalSettings::set_dark_theme_default_colors()
 {
 	setValue(Key_View_FillSignalHighAreaColor,
-		QColor(188, 188, 188, 9 * 256 / 100).rgba());
+		QColor(228, 231, 236, 9 * 256 / 100).rgba());
 
 	setValue(Key_View_CursorFillColor,
-		QColor(60, 60, 60).rgba());
+		Theme::cursor_fill().rgba());
 }
 
 bool GlobalSettings::current_theme_is_dark()
@@ -237,8 +245,11 @@ void GlobalSettings::apply_theme()
 		dark_palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
 		qApp->setPalette(dark_palette);
 		is_dark_theme_ = true;
+	} else if (theme_name.compare("PulseView Dark") == 0) {
+		qApp->setPalette(Theme::dark_palette());
+		is_dark_theme_ = true;
 	} else if (theme_name.compare("DarkStyle") == 0) {
-		QPalette dark_palette;
+		QPalette dark_palette = default_palette_;
 		dark_palette.setColor(QPalette::Window, QColor(53, 53, 53));
 		dark_palette.setColor(QPalette::WindowText, Qt::white);
 		dark_palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(127, 127, 127));
@@ -255,7 +266,7 @@ void GlobalSettings::apply_theme()
 		dark_palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(127, 127, 127));
 		dark_palette.setColor(QPalette::BrightText, Qt::red);
 		dark_palette.setColor(QPalette::Link, QColor(42, 130, 218));
-		dark_palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
+		dark_palette.setColor(QPalette::Highlight, QColor(0, 122, 204));
 		dark_palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor(80, 80, 80));
 		dark_palette.setColor(QPalette::HighlightedText, Qt::white);
 		dark_palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QColor(127, 127, 127));

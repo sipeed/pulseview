@@ -39,7 +39,7 @@ namespace trace {
 const int TraceGroup::Padding = 8;
 const int TraceGroup::Width = 12;
 const int TraceGroup::LineThickness = 5;
-const QColor TraceGroup::LineColor(QColor(0x55, 0x57, 0x53));
+const QColor TraceGroup::LineColor(QColor(0x47, 0x4E, 0x5B));  // Theme::border_strong()
 
 TraceGroup::~TraceGroup()
 {

@@ -23,6 +23,7 @@
 /* Application details */
 #define PV_TITLE "@PV_TITLE@"
 #define PV_BIN_NAME "@PROJECT_NAME@"
+#define PV_DATA_DIR "@CMAKE_INSTALL_FULL_DATAROOTDIR@/pulseview"
 
 /* Pulseview version information */
 #define PV_VERSION_MAJOR @PV_VERSION_MAJOR@

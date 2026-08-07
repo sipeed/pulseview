@@ -103,6 +103,36 @@ A human-readable form has been saved to disk and was written to the log. You may
         <translation>设置</translation>
     </message>
     <message>
+        <location filename="../pv/mainwindow.cpp" line="575"/>
+        <location filename="../pv/mainwindow.cpp" line="637"/>
+        <source>No session</source>
+        <translation>无会话</translation>
+    </message>
+    <message>
+        <location filename="../pv/mainwindow.cpp" line="578"/>
+        <location filename="../pv/mainwindow.cpp" line="638"/>
+        <location filename="../pv/mainwindow.cpp" line="647"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <location filename="../pv/mainwindow.cpp" line="581"/>
+        <location filename="../pv/mainwindow.cpp" line="639"/>
+        <location filename="../pv/mainwindow.cpp" line="665"/>
+        <source>No device</source>
+        <translation>无设备</translation>
+    </message>
+    <message>
+        <location filename="../pv/mainwindow.cpp" line="650"/>
+        <source>Waiting for trigger</source>
+        <translation>等待触发</translation>
+    </message>
+    <message>
+        <location filename="../pv/mainwindow.cpp" line="653"/>
+        <source>Acquiring</source>
+        <translation>正在采集</translation>
+    </message>
+    <message>
         <location filename="../pv/mainwindow.cpp" line="589"/>
         <source>Reload</source>
         <translation>重新加载</translation>
@@ -918,6 +948,22 @@ PulseView可能需要重新启动才能正确显示。</translation>
         <location filename="../pv/toolbars/mainbar.cpp" line="124"/>
         <source>New &amp;View</source>
         <translation>新建视图</translation>
+    </message>
+    <message>
+        <source>Session</source>
+        <translation>会话</translation>
+    </message>
+    <message>
+        <source>Session actions</source>
+        <translation>会话操作</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>添加</translation>
+    </message>
+    <message>
+        <source>Add signal</source>
+        <translation>添加信号</translation>
     </message>
     <message>
         <location filename="../pv/toolbars/mainbar.cpp" line="130"/>
@@ -2185,7 +2231,7 @@ until (condition)
         <location filename="../pv/widgets/devicetoolbutton.cpp" line="80"/>
         <location filename="../pv/widgets/devicetoolbutton.cpp" line="87"/>
         <source>&lt;No Device&gt;</source>
-        <translation></translation>
+        <translation>&lt;无设备&gt;</translation>
     </message>
 </context>
 <context>
