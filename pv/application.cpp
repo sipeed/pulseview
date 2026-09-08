@@ -62,9 +62,9 @@ Application::Application(int &argc, char* argv[]) :
 	QApplication(argc, argv)
 {
 	setApplicationVersion(PV_VERSION_STRING);
-	setApplicationName("PulseView");
-	setOrganizationName("sigrok");
-	setOrganizationDomain("sigrok.org");
+	setApplicationName(PV_TITLE);
+	setOrganizationName("Sipeed");
+	setOrganizationDomain("sipeed.com");
 }
 
 const QStringList Application::get_languages() const

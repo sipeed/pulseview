@@ -21,7 +21,7 @@
 
 cmake_minimum_required(VERSION 2.8.12...3.31.5)
 
-project(pulseview C CXX)
+project(slogicview C CXX)
 
 include(GNUInstallDirs)
 
@@ -283,8 +283,9 @@ memaccess_check_unaligned_le(HAVE_UNALIGNED_LITTLE_ENDIAN_ACCESS)
 #= Config Header
 #-------------------------------------------------------------------------------
 
-set(PV_TITLE PulseView)
+set(PV_TITLE SLogicView)
 set(PV_VERSION_STRING "0.5.0")
+set(SLOGICVIEW_VERSION "" CACHE STRING "SLogicView distribution version override")
 
 if(GLIBMM_2_4_FOUND)
 	set(PV_GLIBMM_VERSION ${PKGDEPS_glibmm-2.4_VERSION})
@@ -294,9 +295,16 @@ endif()
 
 include(GetGitRevisionDescription)
 
-# Append the revision hash unless we are exactly on a tagged release.
-git_describe(PV_TAG_VERSION_STRING --match "pulseview-${PV_VERSION_STRING}" --exact-match)
-if(NOT PV_TAG_VERSION_STRING)
+# A SLogic manifest release owns the public SLogicView version. Upstream-style
+# builds retain PulseView's tag/hash version discovery.
+if(SLOGICVIEW_VERSION)
+	set(PV_VERSION_STRING "${SLOGICVIEW_VERSION}")
+	set(PV_MANUAL_VERSION "unstable")
+else()
+	# Append the revision hash unless we are exactly on a tagged release.
+	git_describe(PV_TAG_VERSION_STRING --match "pulseview-${PV_VERSION_STRING}" --exact-match)
+endif()
+if(NOT SLOGICVIEW_VERSION AND NOT PV_TAG_VERSION_STRING)
 	get_git_head_revision(PV_REVSPEC PV_HASH)
 	if(PV_HASH)
 		string(SUBSTRING "${PV_HASH}" 0 7 PV_SHORTHASH)
@@ -305,12 +313,12 @@ if(NOT PV_TAG_VERSION_STRING)
 
 	# Non-tagged releases use the unstable manual
 	set(PV_MANUAL_VERSION "unstable")
-else()
+elseif(NOT SLOGICVIEW_VERSION)
 	# Tagged releases use a fixed manual version
 	set(PV_MANUAL_VERSION ${PV_VERSION_STRING})
 endif()
 
-if(PV_VERSION_STRING MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[-0-9a-z]*)?$")
+if(PV_VERSION_STRING MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(.*)$")
 	set(PV_VERSION_MAJOR ${CMAKE_MATCH_1})
 	set(PV_VERSION_MINOR ${CMAKE_MATCH_2})
 	set(PV_VERSION_MICRO ${CMAKE_MATCH_3})
@@ -691,24 +699,26 @@ endif()
 # Install the executable.
 install(TARGETS ${PROJECT_NAME} DESTINATION bin/)
 
-# Install the manpage.
-install(FILES doc/pulseview.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 COMPONENT doc)
-
 # Install the desktop file.
-install(FILES contrib/org.sigrok.PulseView.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+install(FILES contrib/com.sipeed.SLogicView.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
 
 # Install the AppData/AppStream file.
-install(FILES contrib/org.sigrok.PulseView.appdata.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo)
+install(FILES contrib/com.sipeed.SLogicView.appdata.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo)
 
-# Install the PulseView icons.
-install(FILES icons/pulseview.png DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps)
-install(FILES icons/pulseview.svg DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps)
+# Install the SLogicView icons. The artwork remains derived from PulseView,
+# while the installed names are distinct so both applications can coexist.
+install(FILES icons/pulseview.png
+	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps
+	RENAME slogicview.png)
+install(FILES icons/pulseview.svg
+	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+	RENAME slogicview.svg)
 
 # Read-only capture shown when no physical acquisition device is connected.
 install(FILES
 	contrib/demo/slogic32-demo.sr
 	contrib/demo/slogic32-demo.pvs
-	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pulseview/demo)
+	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/slogicview/demo)
 
 # Generate Windows installer script.
 configure_file(contrib/pulseview_cross.nsi.in ${CMAKE_CURRENT_BINARY_DIR}/contrib/pulseview_cross.nsi @ONLY)

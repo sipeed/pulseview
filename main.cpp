@@ -163,7 +163,7 @@ void usage()
 		"  -d, --driver                    Specify the device driver to use\n"
 		"  -D, --dont-scan                 Don't auto-scan for devices, use -d spec only\n"
 		"  -i, --input-file                Load input from file\n"
-		"  -s, --settings                  Load PulseView session setup from file\n"
+		"  -s, --settings                  Load SLogicView/PulseView session setup from file\n"
 		"  -I, --input-format              Input format\n"
 		"  -c, --clean                     Don't restore previous sessions on startup\n"
 		"\n", PV_BIN_NAME);

@@ -933,7 +933,7 @@ void MainBar::on_actionSaveSetup_triggered()
 
 	const QString file_name = QFileDialog::getSaveFileName(
 		this, tr("Save File"), dir, tr(
-				"PulseView Session Setups (*.pvs);;"
+				"SLogicView/PulseView Session Setups (*.pvs);;"
 				"All Files (*)"));
 
 	if (file_name.isEmpty())
@@ -950,7 +950,7 @@ void MainBar::on_actionRestoreSetup_triggered()
 
 	const QString file_name = QFileDialog::getOpenFileName(
 		this, tr("Open File"), dir, tr(
-				"PulseView Session Setups (*.pvs);;"
+				"SLogicView/PulseView Session Setups (*.pvs);;"
 				"All Files (*)"));
 
 	if (file_name.isEmpty())

@@ -257,7 +257,7 @@ QWidget *Settings::get_general_settings_form(QWidget *parent) const
 		this, SLOT(on_general_theme_changed(int)));
 	general_layout->addRow(tr("User interface theme"), theme_cb);
 
-	QLabel *description_1 = new QLabel(tr("(You may need to restart PulseView for all UI elements to update)"));
+	QLabel *description_1 = new QLabel(tr("(You may need to restart SLogicView for all UI elements to update)"));
 	description_1->setAlignment(Qt::AlignRight);
 	general_layout->addRow(description_1);
 
@@ -672,13 +672,13 @@ void Settings::on_general_theme_changed(int value)
 	if (settings.current_theme_is_dark()) {
 		msg.setText(tr("You selected a dark theme.\n" \
 			"Should I set the user-adjustable colors to better suit your choice?\n\n" \
-			"Please keep in mind that PulseView may need a restart to display correctly."));
+			"Please keep in mind that SLogicView may need a restart to display correctly."));
 		if (msg.exec() == QMessageBox::Yes)
 			settings.set_dark_theme_default_colors();
 	} else {
 		msg.setText(tr("You selected a bright theme.\n" \
 			"Should I set the user-adjustable colors to better suit your choice?\n\n" \
-			"Please keep in mind that PulseView may need a restart to display correctly."));
+			"Please keep in mind that SLogicView may need a restart to display correctly."));
 		if (msg.exec() == QMessageBox::Yes)
 			settings.set_bright_theme_default_colors();
 	}

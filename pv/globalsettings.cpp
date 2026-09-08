@@ -47,7 +47,7 @@ const vector< pair<QString, QString> > Themes {
 	{"None" , ""},
 	{"QDarkStyleSheet", ":/themes/qdarkstyle/style.qss"},
 	{"DarkStyle", ":/themes/darkstyle/darkstyle.qss"},
-	{"PulseView Dark", ":/themes/pulseview-dark/pulseview-dark.qss"}
+	{"SLogicView Dark", ":/themes/pulseview-dark/pulseview-dark.qss"}
 };
 
 const QString GlobalSettings::Key_General_Language = "General_Language";
@@ -245,7 +245,7 @@ void GlobalSettings::apply_theme()
 		dark_palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
 		qApp->setPalette(dark_palette);
 		is_dark_theme_ = true;
-	} else if (theme_name.compare("PulseView Dark") == 0) {
+	} else if (theme_name.compare("SLogicView Dark") == 0) {
 		qApp->setPalette(Theme::dark_palette());
 		is_dark_theme_ = true;
 	} else if (theme_name.compare("DarkStyle") == 0) {
