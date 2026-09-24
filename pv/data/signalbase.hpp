@@ -114,7 +114,7 @@ public:
 	};
 
 	static const QColor AnalogSignalColors[8];
-	static const QColor LogicSignalColors[10];
+	static const QColor LogicSignalColors[8];
 
 private:
 	static const int ColorBGAlpha;
