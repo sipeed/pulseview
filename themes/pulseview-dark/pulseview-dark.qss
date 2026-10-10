@@ -435,6 +435,9 @@ QComboBox QAbstractItemView {
 	outline: none;
 	selection-background-color: #3D8BFD;
 	selection-color: #FFFFFF;
+	/* A stylesheet makes the list-style popup size to the field width, eliding long items;
+	   give it a floor wide enough to show full item text. */
+	min-width: 150px;
 }
 
 QSpinBox, QDoubleSpinBox {

@@ -591,6 +591,9 @@ QComboBox QAbstractItemView {
     border-radius: 2px;
     border: 1px solid #76797C;
     selection-background-color: #18465d;
+    /* A stylesheet makes the list-style popup size to the field width, eliding long items
+       ("100 MHz" -> "10...Hz"); give it a floor wide enough to show full item text. */
+    min-width: 150px;
 }
 
 QComboBox::drop-down {

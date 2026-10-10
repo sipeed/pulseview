@@ -344,3 +344,8 @@ QSlider::sub-page:horizontal{
 QSlider::sub-page:horizontal:disabled{
   background:rgb(80,80,80);
 }
+/* With a stylesheet the list-style combo popup sizes to the field width and elides long
+   items; give the popup view a floor wide enough to show full item text. */
+QComboBox QAbstractItemView{
+  min-width:150px;
+}
