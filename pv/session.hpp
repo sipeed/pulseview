@@ -269,12 +269,19 @@ Q_SIGNALS:
 	void add_view(ViewType type, Session *session);
 	void session_error_raised(const QString text, const QString info_text);
 
+	/* Emitted from the sampling thread when starting a capture on a hardware
+	 * device failed; handled queued on the GUI thread (reconnect + retry). */
+	void reconnect_requested(QString error);
+
 public Q_SLOTS:
 	void on_data_saved();
 
 #ifdef ENABLE_DECODE
 	void on_new_decoders_selected(vector<const srd_decoder*> decoders);
 #endif
+
+private Q_SLOTS:
+	void on_reconnect_requested(QString error);
 
 private:
 	bool shutting_down_;
@@ -309,6 +316,21 @@ private:
 	vector<uint64_t> segment_sample_count_;
 
 	std::thread sampling_thread_;
+	/* True from start_capture() until the sampling thread has finished
+	 * device_->start(): the capture state is still Stopped then, so a stop
+	 * must wait for the start to land instead of joining a whole capture. */
+	std::atomic<bool> capture_starting_;
+
+	/* Auto-reconnect: a failed start on a hardware device (typically a stale
+	 * USB handle after the analyzer re-enumerated) reopens the device and
+	 * retries the capture once before reporting the error. */
+	bool reopen_device();
+	void try_reconnect();
+	function<void (const QString)> reconnect_error_handler_;
+	QString reconnect_error_;
+	int reconnect_attempts_left_;
+	bool next_start_is_retry_;
+	bool start_is_retry_;
 
 	bool out_of_memory_;
 	bool data_saved_;

@@ -127,6 +127,12 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 
 	setContextMenuPolicy(Qt::PreventContextMenu);
 
+	// Capture errors are reported from the sampling thread; a QMessageBox may
+	// only be built on the GUI thread, so always deliver them queued.
+	connect(this, SIGNAL(session_error_raised(const QString, const QString)),
+		this, SLOT(show_session_error(const QString, const QString)),
+		Qt::QueuedConnection);
+
 	// Actions
 	action_new_view_->setText(tr("New &View"));
 	action_new_view_->setIcon(QIcon(":/icons/window-new.svg"));
@@ -363,8 +369,8 @@ void MainBar::on_run_stop_clicked()
 {
 	switch (session_.get_capture_state()) {
 	case Session::Stopped:
-		session_.start_capture([&](QString message) {
-			show_session_error(tr("Capture failed"), message); });
+		session_.start_capture([this](QString message) {
+			Q_EMIT session_error_raised(tr("Capture failed"), message); });
 		break;
 	case Session::AwaitingTrigger:
 	case Session::Running:

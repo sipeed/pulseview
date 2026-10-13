@@ -18,6 +18,7 @@
  */
 
 #include <cassert>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -27,6 +28,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QTimer>
 
 #include "devicemanager.hpp"
 #include "mainwindow.hpp"
@@ -124,10 +126,17 @@ Session::Session(DeviceManager &device_manager, QString name) :
 	name_(name),
 	capture_state_(Stopped),
 	cur_samplerate_(0),
+	capture_starting_(false),
+	reconnect_attempts_left_(0),
+	next_start_is_retry_(false),
+	start_is_retry_(false),
 	data_saved_(true)
 {
 	// Use this name also for the QObject instance
 	setObjectName(name_);
+
+	connect(this, SIGNAL(reconnect_requested(QString)),
+		this, SLOT(on_reconnect_requested(QString)), Qt::QueuedConnection);
 }
 
 Session::~Session()
@@ -814,6 +823,15 @@ void Session::start_capture(function<void (const QString)> error_handler)
 		return;
 	}
 
+	// A start is already in flight (e.g. a rapid second click): ignore it.
+	if (capture_starting_)
+		return;
+
+	// Only the automatic retry after a reconnect is a retry; a user start
+	// gets a fresh reconnect attempt of its own.
+	start_is_retry_ = next_start_is_retry_;
+	next_start_is_retry_ = false;
+
 	stop_capture();
 
 	// Check that at least one channel is enabled
@@ -848,17 +866,103 @@ void Session::start_capture(function<void (const QString)> error_handler)
 	acq_start_time_ = Glib::DateTime::create_now_local();
 
 	// Begin the session
+	capture_starting_ = true;
 	sampling_thread_ = std::thread(&Session::sample_thread_proc, this, error_handler);
 }
 
 void Session::stop_capture()
 {
+	// While device_->start() is still running on the sampling thread the state
+	// reads Stopped, so device_->stop() would be skipped and the join below
+	// would wait for the whole capture. Let the start land first.
+	while (capture_starting_ && sampling_thread_.joinable())
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
 	if (get_capture_state() != Stopped)
 		device_->stop();
 
 	// Check that sampling stopped
 	if (sampling_thread_.joinable())
 		sampling_thread_.join();
+}
+
+bool Session::reopen_device()
+{
+	shared_ptr<devices::HardwareDevice> hw =
+		dynamic_pointer_cast<devices::HardwareDevice>(device_);
+	if (!hw)
+		return false;
+
+	// HardwareDevice::open() creates a fresh sigrok session, and the driver's
+	// open resets the threshold: carry the trigger and threshold across so
+	// the user's setup survives. Views, channels and decoders are untouched.
+	shared_ptr<sigrok::Trigger> trigger;
+	if (device_->session())
+		trigger = device_->session()->trigger();
+	Glib::VariantBase threshold;
+	bool have_threshold = false;
+	try {
+		threshold = device_->device()->config_get(ConfigKey::VOLTAGE_THRESHOLD);
+		have_threshold = true;
+	} catch (...) {}
+
+	try {
+		hw->close();
+		hw->open();
+	} catch (const QString &e) {
+		qDebug() << "Reconnect: reopen failed:" << e;
+		return false;
+	} catch (const Error &e) {
+		qDebug() << "Reconnect: reopen failed:" << e.what();
+		return false;
+	}
+
+	if (have_threshold) {
+		try {
+			device_->device()->config_set(ConfigKey::VOLTAGE_THRESHOLD, threshold);
+		} catch (...) {}
+	}
+	if (trigger)
+		device_->session()->set_trigger(trigger);
+	device_->session()->add_datafeed_callback([=]
+		(shared_ptr<sigrok::Device> device, shared_ptr<Packet> packet) {
+			data_feed_in(device, packet);
+		});
+
+	return true;
+}
+
+void Session::on_reconnect_requested(QString error)
+{
+	// The sampling thread has returned (or is about to); reap it.
+	if (sampling_thread_.joinable())
+		sampling_thread_.join();
+
+	reconnect_error_ = error;
+	reconnect_attempts_left_ = 10; // ~5 s for the analyzer to come back
+	try_reconnect();
+}
+
+void Session::try_reconnect()
+{
+	if (shutting_down_ || !device_ || get_capture_state() != Stopped)
+		return;
+
+	if (reopen_device()) {
+		qDebug() << "Reconnect: device reopened, restarting capture.";
+		next_start_is_retry_ = true;
+		start_capture(reconnect_error_handler_);
+		return;
+	}
+
+	if (--reconnect_attempts_left_ > 0) {
+		QTimer::singleShot(500, this, [this]() { try_reconnect(); });
+		return;
+	}
+
+	if (reconnect_error_handler_)
+		reconnect_error_handler_(tr("Device disconnected and did not come "
+			"back.\n\n%1").arg(reconnect_error_));
 }
 
 void Session::register_view(shared_ptr<views::ViewBase> view)
@@ -1270,8 +1374,10 @@ void Session::sample_thread_proc(function<void (const QString)> error_handler)
 	pipeline_->set_state(Gst::STATE_NULL);
 
 #else
-	if (!device_)
+	if (!device_) {
+		capture_starting_ = false;
 		return;
+	}
 
 	try {
 		cur_samplerate_ = device_->read_config<uint64_t>(ConfigKey::SAMPLERATE);
@@ -1294,12 +1400,23 @@ void Session::sample_thread_proc(function<void (const QString)> error_handler)
 	try {
 		device_->start();
 	} catch (Error& e) {
-		error_handler(e.what());
+		capture_starting_ = false;
+		// The analyzer re-enumerates (new USB address) after a reset or a
+		// replug, which leaves this handle stale. Reconnect and retry once
+		// on the GUI thread before giving up.
+		if (!start_is_retry_ &&
+			dynamic_pointer_cast<devices::HardwareDevice>(device_)) {
+			reconnect_error_handler_ = error_handler;
+			Q_EMIT reconnect_requested(QString(e.what()));
+		} else {
+			error_handler(e.what());
+		}
 		return;
 	}
 
 	set_capture_state(device_->session()->trigger() ?
 		AwaitingTrigger : Running);
+	capture_starting_ = false;
 
 	try {
 		device_->run();

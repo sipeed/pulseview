@@ -158,6 +158,8 @@ protected:
 Q_SIGNALS:
 	void new_view(Session *session, int type);
 	void show_decoder_selector(Session *session);
+	/* Emitted from the capture thread; delivered queued to the GUI thread. */
+	void session_error_raised(const QString text, const QString info_text);
 
 private:
 	QAction *const action_new_view_;
