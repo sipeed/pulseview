@@ -273,6 +273,13 @@ Q_SIGNALS:
 	 * device failed; handled queued on the GUI thread (reconnect + retry). */
 	void reconnect_requested(QString error);
 
+	/* A decoder was added by the user (not when restoring a setup). */
+	void decoders_added();
+
+	/* The device was (re)opened or a capture started: device-side settings
+	 * such as the channel mode may have changed under the UI. */
+	void device_config_refreshed();
+
 public Q_SLOTS:
 	void on_data_saved();
 

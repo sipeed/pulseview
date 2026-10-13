@@ -134,6 +134,7 @@ private Q_SLOTS:
 	void on_sample_rate_changed();
 
 	void on_config_changed();
+	void on_device_config_refreshed();
 
 	void on_actionNewView_triggered(QAction* action = nullptr);
 

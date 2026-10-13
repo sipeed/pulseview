@@ -416,6 +416,10 @@ shared_ptr<Session> MainWindow::add_session()
 	connect(protocol_panel, SIGNAL(decode_table_requested(Session*)),
 		this, SLOT(on_decode_table_requested(Session*)));
 
+	// Bring the decoder settings up as soon as the user adds a decoder
+	connect(session.get(), &Session::decoders_added, protocol_dock,
+		[protocol_dock]() { protocol_dock->show(); protocol_dock->raise(); });
+
 	// Hidden by default like the other panels, toggled from the Panels
 	// menu so that the tool bar gets the full window width
 	protocol_dock->hide();

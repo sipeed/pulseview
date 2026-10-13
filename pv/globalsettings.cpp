@@ -25,6 +25,7 @@
 #include <QColor>
 #include <QDebug>
 #include <QFile>
+#include <QFont>
 #include <QFontMetrics>
 #include <QPixmapCache>
 #include <QString>
@@ -220,6 +221,12 @@ void GlobalSettings::apply_theme()
 	QString resource_name = Themes.at(value(Key_General_Theme).toInt()).second;
 
 	if (!resource_name.isEmpty()) {
+		// Painted views (traces, ruler, markers) use the application font,
+		// not the style sheet; keep them at the theme's 14 px base size.
+		QFont font = qApp->font();
+		font.setPixelSize(14);
+		qApp->setFont(font);
+
 		QFile file(resource_name);
 		file.open(QFile::ReadOnly | QFile::Text);
 		qApp->setStyleSheet(file.readAll());

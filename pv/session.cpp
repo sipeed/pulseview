@@ -635,6 +635,7 @@ void Session::set_device(shared_ptr<devices::Device> device)
 			});
 
 		update_signals();
+		device_config_refreshed();
 	}
 
 	device_changed();
@@ -928,6 +929,7 @@ bool Session::reopen_device()
 		(shared_ptr<sigrok::Device> device, shared_ptr<Packet> packet) {
 			data_feed_in(device, packet);
 		});
+	device_config_refreshed();
 
 	return true;
 }
@@ -1417,6 +1419,7 @@ void Session::sample_thread_proc(function<void (const QString)> error_handler)
 	set_capture_state(device_->session()->trigger() ?
 		AwaitingTrigger : Running);
 	capture_starting_ = false;
+	device_config_refreshed(); // queued to the GUI thread
 
 	try {
 		device_->run();
@@ -1855,11 +1858,13 @@ void Session::on_new_decoders_selected(vector<const srd_decoder*> decoders)
 
 	shared_ptr<data::DecodeSignal> signal = add_decode_signal();
 
-	if (signal)
+	if (signal) {
 		for (unsigned int i = 0; i < decoders.size(); i++) {
 			const srd_decoder* d = decoders[i];
 			signal->stack_decoder(d, !(i < decoders.size() - 1));
 		}
+		decoders_added();
+	}
 }
 #endif
 

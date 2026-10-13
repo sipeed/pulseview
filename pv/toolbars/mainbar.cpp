@@ -23,6 +23,7 @@
 #include <cassert>
 
 #include <QAction>
+#include <QApplication>
 #include <QDebug>
 #include <QFileDialog>
 #include <QHelpEvent>
@@ -129,6 +130,11 @@ MainBar::MainBar(Session &session, QWidget *parent, pv::views::trace::View *view
 
 	// Capture errors are reported from the sampling thread; a QMessageBox may
 	// only be built on the GUI thread, so always deliver them queued.
+	// The driver may change device-side settings (channel mode, rate) on
+	// reopen or at capture start; resync the widgets on the GUI thread.
+	connect(&session_, SIGNAL(device_config_refreshed()),
+		this, SLOT(on_device_config_refreshed()), Qt::QueuedConnection);
+
 	connect(this, SIGNAL(session_error_raised(const QString, const QString)),
 		this, SLOT(show_session_error(const QString, const QString)),
 		Qt::QueuedConnection);
@@ -879,6 +885,16 @@ void MainBar::on_config_changed()
 	for (auto& signal: session_.signalbases()) {
 		signal->enabled_changed(signal->enabled());
 	}
+}
+
+void MainBar::on_device_config_refreshed()
+{
+	// Never rebuild a popup the user is looking at
+	if (QApplication::activePopupWidget())
+		return;
+	update_device_config_widgets();
+	for (auto& signal : session_.signalbases())
+		signal->enabled_changed(signal->enabled());
 }
 
 void MainBar::on_actionNewView_triggered(QAction* action)
